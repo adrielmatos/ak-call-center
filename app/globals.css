@@ -45,3 +45,60 @@
 .resultCards{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}.resultCard{border:1px solid #e3eaf2;border-radius:11px;padding:10px;background:#fafbfd}.resultCard>div:first-child{display:flex;justify-content:space-between;gap:6px}.resultCard b{font-size:10px}.resultCard small{color:var(--muted);font-size:8px}.resultList{margin-top:8px;display:grid;gap:4px}.resultList button{border:1px solid #e5ebf2;background:#fff;border-radius:7px;padding:6px 7px;text-align:left;font-size:8px;display:flex;justify-content:space-between}.resultList button span{color:#8da0b5}
 @media(max-width:900px){.userGrid,.permissionGrid{grid-template-columns:1fr 1fr}.resultCards{grid-template-columns:1fr 1fr}.twoFields{grid-template-columns:1fr}.campaignCard{align-items:flex-start}.campaignActions{margin-left:auto}}
 @media(max-width:600px){.content{padding:10px}.sidebar{padding:8px}.sidebar nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;overflow:visible}.sidebar nav button{min-width:0;width:100%;padding:7px 2px;font-size:8px}.sidebar nav button i{font-size:10px}.operator{margin-bottom:6px}.sidebar>.btn{font-size:9px;padding:8px}.header{gap:9px}.headActions{flex-wrap:wrap}.headActions .online{display:none}.headActions .btn{flex:1}.userGrid,.permissionGrid,.resultCards{grid-template-columns:1fr}.calendarDay{min-height:50px}.calendarBlank{min-height:50px}.calendarHead,.calendarGrid{gap:3px}.calendarDay{padding:5px}.campaignCard{flex-wrap:wrap}.campaignActions{width:100%;display:flex;justify-content:flex-end}.channelTabs button{padding:8px 10px}.smallModal{max-width:none}}
+
+/* AK v2 visual system: conteúdo mais compacto, alinhado e responsivo */
+.content{max-width:1480px;padding:24px 28px}
+.header{padding:0 2px 4px}
+.stack{gap:12px}
+.panel{border-radius:14px;padding:16px;box-shadow:0 6px 22px rgba(17,35,59,.055)}
+.metricGrid{gap:10px}
+.metric{min-height:88px}
+.dashboardGrid,.dialGrid{gap:12px}
+.toolbar{margin-bottom:12px}
+.panelTitle{margin-bottom:12px}
+.userGrid{grid-template-columns:repeat(4,1fr)}
+.permissionGrid{grid-template-columns:repeat(4,1fr)}
+.resultTabs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.resultTabs button{border:1px solid var(--line);background:#fafbfd;border-radius:10px;padding:11px 10px;text-align:left;font-size:10px;font-weight:800;color:#42566e}
+.resultTabs button span{float:right;background:#edf5ff;color:#1765b4;border-radius:999px;padding:3px 6px}
+.resultTabs button.sel{background:#eaf4ff;border-color:#8fbee9;color:#125fae}
+.callLink{display:inline-block;margin-left:5px;text-decoration:none}
+.campaignCard{min-height:104px}
+.reportHeader .metricGrid{margin-top:6px}
+.reportDay{cursor:pointer;pointer-events:auto}
+@media(max-width:1200px){.userGrid,.permissionGrid{grid-template-columns:repeat(3,1fr)}.resultTabs{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){
+ .content{padding:14px}
+ .userGrid,.permissionGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .resultTabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .panel{padding:13px}
+}
+@media(max-width:600px){
+ .content{padding:9px}
+ .stack{gap:9px}
+ .panel{padding:11px;border-radius:12px}
+ .header h1{font-size:21px}
+ .header p{font-size:9px}
+ .metricGrid{gap:6px}
+ .metric{min-height:74px;padding:9px}
+ .metricIcon{width:34px;height:34px}
+ .metric strong{font-size:18px}
+ .metric span,.metric small{font-size:8px}
+ .userGrid,.permissionGrid,.resultTabs{grid-template-columns:1fr 1fr}
+ .permission{padding:8px}
+ .permission b{font-size:9px}
+ .permission small{font-size:7px}
+ .calendarDay{min-height:46px;font-size:9px}
+ .calendarHead b{font-size:8px}
+ .campaignCard{min-height:0;padding:10px}
+ .campaignActions{width:100%;justify-content:flex-start}
+ .campaignActions .tableBtn{flex:1}
+ .resultTabs button{padding:9px 8px;font-size:9px}
+ .tableWrap{border-radius:9px}
+}
+@media(max-width:420px){
+ .userGrid,.permissionGrid,.resultTabs{grid-template-columns:1fr}
+ .metricGrid{grid-template-columns:1fr 1fr}
+ .sidebar nav{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .sidebar nav button{min-height:46px}
+}
