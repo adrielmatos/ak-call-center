@@ -8,7 +8,7 @@ type Stage={id:string;nome:string;cor:string;ordem:number};
 type Campaign={id:string;nome:string;produto?:string;status:string;created_at:string;inicio_at?:string;fim_at?:string};
 type ReturnRow={id:string;lead_id:string;operador_id?:string;data_hora:string;observacao?:string;concluido:boolean;lead?:any};
 type UserRow={id:string;nome:string;email?:string;perfil:string;ativo:boolean;auth_user_id?:string;permissoes?:Record<string,boolean>;preferencias?:Record<string,any>};
-const APP_VERSION="2.0.0";
+const APP_VERSION="2.1.0";
 const results=["Interessado","Retorno","Simulação","Proposta","Contrato","Não atendeu","Não interessado","Número inválido","Sem perfil"];
 const mask=(v="")=>v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4");
 const initials=(v="")=>v.split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
