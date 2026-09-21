@@ -12,7 +12,7 @@ export default function Home(){
  const[session,setSession]=useState<any>(null),[operator,setOperator]=useState<any>(null),[mode,setMode]=useState("dashboard"),[leads,setLeads]=useState<Lead[]>([]),[npd,setNpd]=useState<any[]>([]),[loading,setLoading]=useState(false),[showImport,setShowImport]=useState(false),[preview,setPreview]=useState<any>(null),[file,setFile]=useState<File|null>(null),[msg,setMsg]=useState(""),[search,setSearch]=useState(""),[page,setPage]=useState(1);
  const pageSize=50;
  const available=useMemo(()=>leads.filter(l=>l.status==="disponivel"&&!l.bloqueado&&!l.opt_out&&l.telefones?.length),[leads]),current=available[0];
- const filtered=useMemo(()=>leads.filter(l=>[l.nome,l.cpf,l.cidade,l.uf,l.produto,l.status].join(" ").toLowerCase().includes(search.toLowerCase())),[leads,search]);
+ const[debouncedSearch,setDebouncedSearch]=useState(""); useEffect(()=>{const t=setTimeout(()=>setDebouncedSearch(search),250);return()=>clearTimeout(t)},[search]); const filtered=useMemo(()=>leads.filter(l=>[l.nome,l.cpf,l.cidade,l.uf,l.produto,l.status].join(" ").toLowerCase().includes(debouncedSearch.toLowerCase())),[leads,debouncedSearch]);
  const paged=filtered.slice((page-1)*pageSize,page*pageSize);
  useEffect(()=>{if(!supabase)return;supabase.auth.getSession().then(({data})=>setSession(data.session));const{data}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>data.subscription.unsubscribe()},[]);
  useEffect(()=>{if(session){load();loadOperator()}},[session]);
