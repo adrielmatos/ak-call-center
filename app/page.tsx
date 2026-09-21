@@ -13,7 +13,7 @@ const initials=(v="")=>v.split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join
 export default function Home(){
  const[session,setSession]=useState<any>(null),[operator,setOperator]=useState<any>(null),[mode,setMode]=useState("dashboard");
  const[leads,setLeads]=useState<Lead[]>([]),[npd,setNpd]=useState<any[]>([]),[stages,setStages]=useState<Stage[]>([]),[campaigns,setCampaigns]=useState<Campaign[]>([]);
- const[loading,setLoading]=useState(false),[error,setError]=useState(""),[showImport,setShowImport]=useState(false),[preview,setPreview]=useState<any>(null),[file,setFile]=useState<File|null>(null),[msg,setMsg]=useState("");
+ const[loading,setLoading]=useState(false),[error,setError]=useState(""),[showImport,setShowImport]=useState(false),[previews,setPreviews]=useState<any[]>([]),[files,setFiles]=useState<File[]>([]),[msg,setMsg]=useState("");
  const[search,setSearch]=useState(""),[page,setPage]=useState(1),[selectedLead,setSelectedLead]=useState<Lead|null>(null),[authReady,setAuthReady]=useState(false),[recovery,setRecovery]=useState(false);
  const pageSize=50;
  const[debouncedSearch,setDebouncedSearch]=useState("");
@@ -81,17 +81,26 @@ export default function Home(){
   if(error)setError(error.message);else{setRecovery(false);setMsg("Senha alterada com sucesso. Você já pode usar a central.");}
  }
  async function doImport(){
-  if(!supabase||!file||!preview)return;
+  if(!supabase||!files.length||!previews.length)return;
   setLoading(true);setError("");setMsg("");
-  const{data:imp,error:ie}=await supabase.from("importacoes").insert({nome_arquivo:file.name,extensao:preview.ext,total:preview.total,validos:0,duplicados:0,invalidos:preview.total-preview.validos,sem_telefone:0,mapeamento:preview.map}).select().single();
-  if(ie){setError(ie.message);setLoading(false);return}
-  const rows=preview.rows.map((r:any)=>({nome:String(r.nome||"").trim(),cpf:r.cpf||null,cidade:r.cidade||"",uf:r.uf||"",produto:r.produto||"",observacao:r.observacao||"",extras:r.extras||{},telefone_original:r.telefone||"",telefone_normalizado:phone(r.telefone||"")||null,telefone2_original:r.telefone2||"",telefone2_normalizado:phone(r.telefone2||"")||null}));
-  const{data:result,error:re}=await supabase.rpc("import_leads_batch",{p_importacao_id:imp.id,p_rows:rows});
-  if(re){setError("Erro na importação: "+re.message);setLoading(false);return}
-  const s=result||{};setMsg("Importação concluída: "+(s.adicionados||0)+" adicionados • "+(s.duplicados||0)+" duplicados • "+(s.bloqueados||0)+" bloqueados • "+(s.sem_telefone||0)+" sem telefone.");
-  setShowImport(false);setPreview(null);setFile(null);await audit("importacao_concluida","importacoes",imp.id,s);await load();setLoading(false);
- }
- async function callResult(result:string){
+  let adicionados=0,duplicados=0,bloqueados=0,semTelefone=0,importados=0;
+  try{
+    for(let i=0;i<files.length;i++){
+      const file=files[i],preview=previews[i];
+      const{data:imp,error:ie}=await supabase.from("importacoes").insert({nome_arquivo:file.name,extensao:preview.ext,total:preview.total,validos:0,duplicados:0,invalidos:preview.total-preview.validos,sem_telefone:0,mapeamento:preview.map}).select().single();
+      if(ie)throw ie;
+      const rows=preview.rows.map((r:any)=>({nome:String(r.nome||"").trim(),cpf:r.cpf||null,cidade:r.cidade||"",uf:r.uf||"",produto:r.produto||"",observacao:r.observacao||"",extras:r.extras||{},telefone_original:r.telefone||"",telefone_normalizado:phone(r.telefone||"")||null,telefone2_original:r.telefone2||"",telefone2_normalizado:phone(r.telefone2||"")||null}));
+      const{data:result,error:re}=await supabase.rpc("import_leads_batch",{p_importacao_id:imp.id,p_rows:rows});
+      if(re)throw re;
+      const s=result||{};adicionados+=Number(s.adicionados||0);duplicados+=Number(s.duplicados||0);bloqueados+=Number(s.bloqueados||0);semTelefone+=Number(s.sem_telefone||0);importados++;
+      await audit("importacao_concluida","importacoes",imp.id,s);
+    }
+    setMsg(importados+" arquivo(s) importado(s): "+adicionados+" adicionados • "+duplicados+" duplicados • "+bloqueados+" bloqueados • "+semTelefone+" sem telefone.");
+    setShowImport(false);setPreviews([]);setFiles([]);await load();
+  }catch(e:any){setError("Erro na importação: "+(e?.message||"não foi possível processar os arquivos."));}
+  finally{setLoading(false);}
+}
+async function callResult(result:string){
   if(!supabase||!current)return;
   const t=current.telefones?.[0],now=new Date().toISOString();
   const{error:e}=await supabase.from("ligacoes").insert({lead_id:current.id,telefone_id:t?.id,operador_id:operator?.id,inicio:now,fim:now,resultado:result});
@@ -153,7 +162,7 @@ export default function Home(){
    {mode==="npd"&&<Npd rows={npd}/>}
    {mode==="config"&&<Settings operator={operator}/>}
    {selectedLead&&<LeadDrawer lead={selectedLead} onClose={()=>setSelectedLead(null)} onMove={moveLead} stages={stages}/>}
-   {showImport&&<ImportModal file={file} setFile={async f=>{setFile(f);if(f)try{setPreview(await parseFile(f))}catch{setError("Não foi possível ler o arquivo. Verifique se a planilha está íntegra.")}}} preview={preview} onClose={()=>{setShowImport(false);setPreview(null);setMsg("")}} onImport={doImport} loading={loading}/>}
+   {showImport&&<ImportModal files={files} previews={previews} onFiles={async selected=>{setError("");setFiles(selected);try{setPreviews(await Promise.all(selected.map(f=>parseFile(f))))}catch{setPreviews([]);setError("Não foi possível ler uma das planilhas. Verifique se os arquivos estão íntegros.")}}} onClose={()=>{setShowImport(false);setPreviews([]);setFiles([]);setMsg("")}} onImport={doImport} loading={loading}/>}
   </main>
  </div>;
 }
@@ -187,5 +196,4 @@ function Reports({leads,npd}:{leads:Lead[];npd:any[]}){const total=leads.length|
 function Npd({rows}:{rows:any[]}){return <div className="panel"><PanelTitle title="Não Perturbe" subtitle="Bloqueios ativos que devem permanecer fora da fila."/><div className="tableWrap"><table><thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Origem</th><th>Motivo</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td>{r.nome||"—"}</td><td>{r.cpf?mask(r.cpf):"—"}</td><td>{r.telefone||"—"}</td><td>{r.origem}</td><td>{r.motivo||"—"}</td></tr>)}</tbody></table>{!rows.length&&<Empty title="Nenhum bloqueio ativo" text="Use o botão Não ligar mais na fila."/>}</div></div>}
 function Settings({operator}:{operator:any}){return <div className="featureGrid"><Feature title="Perfil" state={operator?.perfil||"operador"} text={"Usuário: "+(operator?.nome||"—")+" • "+(operator?.email||"—")}/><Feature title="Segurança" state="Ativa" text="RLS, auditoria, cabeçalhos de segurança, limite de importação e separação de privilégios no banco."/><Feature title="LGPD operacional" state="Ativa" text="Não Perturbe centralizado, registro de ações e estrutura para histórico do cliente."/><Feature title="Infraestrutura" state="Vercel + Supabase" text="Frontend Next.js e banco PostgreSQL gerenciado. Dados privados não devem ser colocados em cache público." /></div>}
 function LeadDrawer({lead,onClose,onMove,stages}:{lead:Lead;onClose:()=>void;onMove:(id:string,s:string)=>void;stages:Stage[]}){return <div className="drawerBackdrop" onClick={onClose}><aside className="drawer" onClick={e=>e.stopPropagation()}><div className="drawerHead"><div className="personAvatar">{initials(lead.nome)}</div><button className="iconBtn" onClick={onClose}>×</button></div><div className="eyebrow">FICHA DO CLIENTE</div><h2>{lead.nome}</h2><p>{lead.cidade||"—"} {lead.uf&&"• "+lead.uf}</p><div className="drawerPhone">{lead.telefones?.[0]?.numero_normalizado||"Sem telefone"}</div><div className="drawerSection"><b>Etapa do CRM</b>{stages.map(s=><button key={s.id} className={lead.status===s.nome.toLowerCase()?"stageActive":""} onClick={()=>onMove(lead.id,s.nome.toLowerCase())}>{s.nome}</button>)}</div><div className="drawerSection"><b>Dados</b><p>CPF: {lead.cpf?mask(lead.cpf):"não informado"}</p><p>Produto: {lead.produto||"não informado"}</p><p>Prioridade: {lead.prioridade}</p></div></aside></div>}
-function ImportModal({file,setFile,preview,onClose,onImport,loading}:{file:File|null;setFile:(f:File|null)=>void;preview:any;onClose:()=>void;onImport:()=>void;loading:boolean}){return <div className="modal" onClick={onClose}><div className="modalBox" onClick={e=>e.stopPropagation()}><div className="toolbar"><div><div className="eyebrow">IMPORTAÇÃO SEGURA</div><h2>Adicionar mailing</h2><p>XLS • XLSX • ODS • CSV • TXT</p></div><button className="btn" onClick={onClose}>Fechar</button></div><label className="drop"><input type="file" accept=".xls,.xlsx,.ods,.csv,.txt" hidden onChange={e=>setFile(e.target.files?.[0]||null)}/><span>↑</span><b>{file?file.name:"Selecione sua planilha"}</b><small>O sistema detecta colunas de nome, CPF, telefone, cidade, UF e produto.</small></label>{preview&&<><div className="notice"><b>{preview.total}</b> linhas lidas • <b>{preview.validos}</b> com nome e telefone.</div><div className="tableWrap preview"><table><thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Cidade</th><th>Produto</th></tr></thead><tbody>{preview.rows.slice(0,8).map((r:any,i:number)=><tr key={i}><td>{r.nome}</td><td>{r.cpf?mask(r.cpf):""}</td><td>{r.telefone}</td><td>{r.cidade}</td><td>{r.produto}</td></tr>)}</tbody></table></div><button className="btn primary full big" disabled={loading} onClick={onImport}>{loading?"Processando...":"Confirmar importação"}</button></>}</div></div>}
-function Empty({title,text}:{title:string;text:string}){return <div className="empty"><b>{title}</b><span>{text}</span></div>}
+function ImportModal({files,previews,onFiles,onClose,onImport,loading}:{files:File[];previews:any[];onFiles:(f:File[])=>void;onClose:()=>void;onImport:()=>void;loading:boolean}){return <div className="modal" onClick={onClose}><div className="modalBox" onClick={e=>e.stopPropagation()}><div className="toolbar"><div><div className="eyebrow">IMPORTAÇÃO SEGURA</div><h2>Adicionar mailing</h2><p>XLS • XLSX • ODS • CSV • TXT • vários arquivos de uma vez</p></div><button className="btn" onClick={onClose}>Fechar</button></div><label className="drop"><input type="file" accept=".xls,.xlsx,.ods,.csv,.txt" multiple hidden onChange={e=>onFiles(Array.from(e.target.files||[]))}/><span>↑</span><b>{files.length?files.length+" arquivo(s) selecionado(s)":"Selecione uma ou várias planilhas"}</b><small>Você pode selecionar vários arquivos de uma vez. O sistema detecta nome, CPF, telefone, cidade, UF e produto.</small></label>{files.length>0&&<div className="fileList">{files.map((f,i)=><div key={f.name+"-"+i}><b>{f.name}</b><span>{previews[i]?previews[i].total+" linhas • "+previews[i].validos+" válidas":"lendo..."}</span></div>)}</div>}{previews.length>0&&<><div className="notice"><b>{previews.reduce((n,p)=>n+Number(p.total||0),0)}</b> linhas lidas em <b>{previews.length}</b> arquivo(s).</div><div className="tableWrap preview"><table><thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Cidade</th><th>Produto</th></tr></thead><tbody>{previews.flatMap(p=>p.rows.slice(0,4)).slice(0,12).map((r:any,i:number)=><tr key={i}><td>{r.nome}</td><td>{r.cpf?mask(r.cpf):""}</td><td>{r.telefone}</td><td>{r.cidade}</td><td>{r.produto}</td></tr>)}</tbody></table></div><button className="btn primary full big" disabled={loading} onClick={onImport}>{loading?"Processando todos os arquivos...":"Importar todos os arquivos"}</button></>}</div></div>}function Empty({title,text}:{title:string;text:string}){return <div className="empty"><b>{title}</b><span>{text}</span></div>}
