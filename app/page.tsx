@@ -162,6 +162,65 @@ async function scheduleReturn(dateTime:string,observacao:string){
   if(e)setError(e.message);else{await audit("campanha_criada","campanhas",undefined,{nome});await load()}
  }
 
+async function createCampaign(data:{nome:string;produto:string;inicio_at?:string;fim_at?:string}){
+  if(!supabase||!operator||!data.nome.trim())return;
+  const{error:e}=await supabase.from("campanhas").insert({nome:data.nome.trim(),produto:data.produto||"Consignado",status:"ativa",inicio_at:data.inicio_at||null,fim_at:data.fim_at||null});
+  if(e)setError(e.message);else{await audit("campanha_criada","campanhas",undefined,data);await load()}
+}
+async function toggleCampaign(id:string,status:string){
+  if(!supabase)return;
+  const next=status==="ativa"?"pausada":"ativa";
+  const{error:e}=await supabase.from("campanhas").update({status:next}).eq("id",id);
+  if(e)setError(e.message);else{await audit("campanha_status","campanhas",id,{status:next});await load()}
+}
+async function deleteCampaign(id:string){
+  if(!supabase)return;
+  if(!window.confirm("Remover esta campanha? O histórico de ligações continuará registrado."))return;
+  const{error:e}=await supabase.from("campanhas").update({status:"removida"}).eq("id",id);
+  if(e)setError(e.message);else{await audit("campanha_removida","campanhas",id);await load()}
+}
+async function updateReturn(id:string,data:{data_hora:string;observacao:string}){
+  if(!supabase)return;
+  const{error:e}=await supabase.from("retornos").update({data_hora:new Date(data.data_hora).toISOString(),observacao:data.observacao||null}).eq("id",id);
+  if(e)setError(e.message);else{await audit("retorno_reagendado","retornos",id,data);await load()}
+}
+async function concludeReturn(row:ReturnRow){
+  if(!supabase)return;
+  const{error:e}=await supabase.from("retornos").update({concluido:true}).eq("id",row.id);
+  if(e){setError(e.message);return}
+  await supabase.from("leads").update({status:"disponivel",updated_at:new Date().toISOString()}).eq("id",row.lead_id);
+  await audit("retorno_concluido","retornos",row.id);await load();
+}
+async function removeNpd(row:any){
+  if(!supabase)return;
+  const{error:e}=await supabase.from("lista_nao_perturbe").update({ativo:false}).eq("id",row.id);
+  if(e){setError(e.message);return}
+  if(row.cpf){
+    await supabase.from("leads").update({bloqueado:false,opt_out:false,status:"disponivel",updated_at:new Date().toISOString()}).eq("cpf",row.cpf);
+  }else if(row.telefone){
+    const{data:ts}=await supabase.from("telefones").select("lead_id").eq("numero_normalizado",row.telefone).limit(20);
+    const ids=(ts||[]).map((x:any)=>x.lead_id);
+    if(ids.length)await supabase.from("leads").update({bloqueado:false,opt_out:false,status:"disponivel",updated_at:new Date().toISOString()}).in("id",ids);
+  }
+  await audit("npd_removido","lista_nao_perturbe",row.id);await load();
+}
+async function saveUserConfig(id:string,permissoes:Record<string,boolean>,preferencias:Record<string,any>,ativo:boolean,perfil:string){
+  if(!supabase||operator?.perfil!=="admin")return;
+  const{error:e}=await supabase.from("operadores").update({permissoes,preferencias,ativo,perfil}).eq("id",id);
+  if(e)setError(e.message);else{await audit("usuario_configurado","operadores",id,{permissoes,preferencias,ativo,perfil});await loadOperator();setMsg("Configuração do usuário salva.")}
+}
+async function saveChannels(data:any){
+  if(!supabase||!operator)return;
+  const{error:e}=await supabase.from("configuracoes_canais").upsert({...data,operador_id:operator.id},{onConflict:"operador_id"});
+  if(e)setError(e.message);else{setChannelConfig({...channelConfig,...data});await audit("canais_configurados","configuracoes_canais",operator.id);setMsg("Configurações de canais salvas.")}
+}
+async function saveDialer(data:any){
+  if(!supabase||!operator)return;
+  const payload={...data,operador_id:operator.id,updated_at:new Date().toISOString()};
+  const{error:e}=await supabase.from("configuracoes_discador").upsert(payload,{onConflict:"operador_id"});
+  if(e)setError(e.message);else{setDialerConfig({...dialerConfig,...data});await audit("telefonia_configurada","configuracoes_discador",operator.id);setMsg("Configuração de telefonia/Discador salva.")}
+}
+
  if(!authReady)return <div className="boot"><div className="bootLogo">A<span>&</span>K</div><div className="spinner"/><p>Inicializando central segura...</p></div>;
  if(!session||recovery)return <AuthScreen recovery={recovery} onAuth={auth} reset={resetPassword} updatePassword={updatePassword} msg={msg} error={error}/>;
 
