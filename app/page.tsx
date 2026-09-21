@@ -11,7 +11,55 @@ export default function Home(){
  useEffect(()=>{if(session)load()},[session]);
  async function load(){if(!supabase)return;setLoading(true);const[{data:l},{data:n}]=await Promise.all([supabase.from("leads").select("*,telefones(id,numero_normalizado)").order("prioridade",{ascending:false}).limit(500),supabase.from("lista_nao_perturbe").select("*").eq("ativo",true).order("data_bloqueio",{ascending:false}).limit(500)]);setLeads((l||[])as any);setNpd(n||[]);setLoading(false)}
  async function auth(email:string,password:string,signup=false){if(!supabase)return;const r=signup?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password});setMsg(r.error?.message||"");}
- async function doImport(){if(!supabase||!file||!preview)return;setLoading(true);const{data:imp,error}=await supabase.from("importacoes").insert({nome_arquivo:file.name,extensao:preview.ext,total:preview.total,validos:preview.validos,mapeamento:preview.map}).select().single();if(error){setMsg(error.message);setLoading(false);return}let added=0,blocked=0;for(const r of preview.rows){if(!r.nome||!r.telefone)continue;const b=await supabase.rpc("lead_bloqueado_por_npd",{p_cpf:r.cpf||null,p_telefone:r.telefone||null});if(b.data){blocked++;continue}const{data:l}=await supabase.from("leads").insert({nome:String(r.nome),cpf:r.cpf||null,cidade:r.cidade||null,uf:r.uf||null,produto:r.produto||null,origem_importacao:imp.id,dados_extras:{...r.extras,observacao:r.observacao||""}}).select().single();if(!l)continue;const nums=[r.telefone,r.telefone2].filter(Boolean);await supabase.from("telefones").insert(nums.map((n:string)=>({lead_id:l.id,numero_original:n,numero_normalizado:n})));added++}await supabase.from("importacoes").update({duplicados:preview.total-preview.validos,sem_telefone:preview.total-preview.validos}).eq("id",imp.id);setMsg("Importação concluída: "+added+" adicionados; "+blocked+" bloqueados pela Não Perturbe.");setShowImport(false);setPreview(null);setFile(null);await load();setLoading(false)}
+ async function doImport(){
+  if(!supabase||!file||!preview)return;
+  setLoading(true);
+  setMsg("");
+  const {data:imp,error}=await supabase.from("importacoes").insert({
+    nome_arquivo:file.name,
+    extensao:preview.ext,
+    total:preview.total,
+    validos:0,
+    duplicados:0,
+    invalidos:preview.total-preview.validos,
+    sem_telefone:0,
+    mapeamento:preview.map
+  }).select().single();
+  if(error){
+    setMsg(error.message);
+    setLoading(false);
+    return;
+  }
+  const rows=preview.rows.map((r:any)=>({
+    nome:String(r.nome||"").trim(),
+    cpf:r.cpf||null,
+    cidade:r.cidade||"",
+    uf:r.uf||"",
+    produto:r.produto||"",
+    observacao:r.observacao||"",
+    extras:r.extras||{},
+    telefone_original:r.telefone||"",
+    telefone_normalizado:phone(r.telefone||"")||null,
+    telefone2_original:r.telefone2||"",
+    telefone2_normalizado:phone(r.telefone2||"")||null
+  }));
+  const {data:result,error:rpcError}=await supabase.rpc("import_leads_batch",{
+    p_importacao_id:imp.id,
+    p_rows:rows
+  });
+  if(rpcError){
+    setMsg("Erro na importação: "+rpcError.message);
+    setLoading(false);
+    return;
+  }
+  const s=result||{};
+  setMsg("Importação concluída: "+(s.adicionados||0)+" adicionados; "+(s.duplicados||0)+" duplicados; "+(s.bloqueados||0)+" bloqueados pela Não Perturbe; "+(s.sem_telefone||0)+" sem telefone.");
+  setShowImport(false);
+  setPreview(null);
+  setFile(null);
+  await load();
+  setLoading(false);
+}
  async function callResult(result:string){if(!supabase||!current)return;const t=current.telefones?.[0];await supabase.from("ligacoes").insert({lead_id:current.id,telefone_id:t?.id,resultado:result,inicio:new Date().toISOString(),fim:new Date().toISOString()});await supabase.from("leads").update({status:result==="Retorno"?"retorno":result==="Interessado"?"interessado":"finalizado",updated_at:new Date().toISOString()}).eq("id",current.id);await load()}
  async function block(){if(!supabase||!current)return;await supabase.from("lista_nao_perturbe").insert({cpf:cpf(current.cpf||"")||null,telefone:phone(current.telefones?.[0]?.numero_normalizado||"")||null,nome:current.nome,origem:"manual",motivo:"Solicitação de não contato"});await supabase.from("leads").update({bloqueado:true,opt_out:true,status:"bloqueado"}).eq("id",current.id);await load()}
  if(!session)return <Login onAuth={auth} msg={msg}/>;
