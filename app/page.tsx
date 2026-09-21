@@ -155,12 +155,6 @@ async function scheduleReturn(dateTime:string,observacao:string){
   const{error:e}=await supabase.from("leads").update({status,updated_at:new Date().toISOString()}).eq("id",id);
   if(e)setError(e.message);else{await audit("crm_movimentacao","leads",id,{status});await load()}
  }
- async function createCampaign(){
-  if(!supabase||!operator)return;
-  const nome=prompt("Nome da campanha");if(!nome)return;
-  const{error:e}=await supabase.from("campanhas").insert({nome,produto:"Consignado",status:"ativa"});
-  if(e)setError(e.message);else{await audit("campanha_criada","campanhas",undefined,{nome});await load()}
- }
 
 async function createCampaign(data:{nome:string;produto:string;inicio_at?:string;fim_at?:string}){
   if(!supabase||!operator||!data.nome.trim())return;
