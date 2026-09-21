@@ -71,6 +71,10 @@ export default function Home(){
     if(ue)setError(ue.message);else setUsers((all||[]) as UserRow[]);
   }else setUsers([data as UserRow]);
 }
+async function audit(acao:string,entidade?:string,entidade_id?:string,detalhes?:any){
+  if(!supabase||!operator?.id)return;
+  await supabase.from("auditoria").insert({operador_id:operator.id,acao,entidade:entidade||null,entidade_id:entidade_id||null,detalhes:detalhes||{}});
+}
   async function auth(email:string,password:string,signup:boolean,nome:string){
   if(!supabase){setError("Banco não configurado.");return}
   setError("");setMsg("");
