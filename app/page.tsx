@@ -2,73 +2,67 @@
 import {useEffect,useMemo,useState} from "react";
 import {supabase} from "@/lib/supabase";
 import {parseFile,phone,cpf} from "@/lib/importer";
+
 type Lead={id:string;nome:string;cpf?:string;cidade?:string;uf?:string;produto?:string;status:string;prioridade:number;bloqueado:boolean;opt_out:boolean;telefones?:{id:string;numero_normalizado:string}[]};
 const results=["Interessado","Retorno","Simulação","Proposta","Contrato","Não atendeu","Não interessado","Número inválido","Sem perfil"];
+const mask=(v="")=>v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4");
+const initials=(v="")=>v.split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
+
 export default function Home(){
- const[session,setSession]=useState<any>(null),[mode,setMode]=useState("dashboard"),[leads,setLeads]=useState<Lead[]>([]),[npd,setNpd]=useState<any[]>([]),[loading,setLoading]=useState(false),[showImport,setShowImport]=useState(false),[preview,setPreview]=useState<any>(null),[file,setFile]=useState<File|null>(null),[msg,setMsg]=useState("");
+ const[session,setSession]=useState<any>(null),[operator,setOperator]=useState<any>(null),[mode,setMode]=useState("dashboard"),[leads,setLeads]=useState<Lead[]>([]),[npd,setNpd]=useState<any[]>([]),[loading,setLoading]=useState(false),[showImport,setShowImport]=useState(false),[preview,setPreview]=useState<any>(null),[file,setFile]=useState<File|null>(null),[msg,setMsg]=useState(""),[search,setSearch]=useState(""),[page,setPage]=useState(1);
+ const pageSize=50;
  const available=useMemo(()=>leads.filter(l=>l.status==="disponivel"&&!l.bloqueado&&!l.opt_out&&l.telefones?.length),[leads]),current=available[0];
+ const filtered=useMemo(()=>leads.filter(l=>[l.nome,l.cpf,l.cidade,l.uf,l.produto,l.status].join(" ").toLowerCase().includes(search.toLowerCase())),[leads,search]);
+ const paged=filtered.slice((page-1)*pageSize,page*pageSize);
  useEffect(()=>{if(!supabase)return;supabase.auth.getSession().then(({data})=>setSession(data.session));const{data}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>data.subscription.unsubscribe()},[]);
- useEffect(()=>{if(session)load()},[session]);
- async function load(){if(!supabase)return;setLoading(true);const[{data:l},{data:n}]=await Promise.all([supabase.from("leads").select("*,telefones(id,numero_normalizado)").order("prioridade",{ascending:false}).limit(500),supabase.from("lista_nao_perturbe").select("*").eq("ativo",true).order("data_bloqueio",{ascending:false}).limit(500)]);setLeads((l||[])as any);setNpd(n||[]);setLoading(false)}
- async function auth(email:string,password:string,signup=false){if(!supabase)return;const r=signup?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password});setMsg(r.error?.message||"");}
+ useEffect(()=>{if(session){load();loadOperator()}},[session]);
+ useEffect(()=>setPage(1),[search]);
+ async function load(){if(!supabase)return;setLoading(true);const[{data:l},{data:n}]=await Promise.all([supabase.from("leads").select("*,telefones(id,numero_normalizado)").order("prioridade",{ascending:false}).order("created_at",{ascending:false}).limit(1000),supabase.from("lista_nao_perturbe").select("*").eq("ativo",true).order("data_bloqueio",{ascending:false}).limit(1000)]);setLeads((l||[])as any);setNpd(n||[]);setLoading(false)}
+ async function loadOperator(){if(!supabase||!session?.user?.id)return;const{data}=await supabase.from("operadores").select("*").eq("auth_user_id",session.user.id).maybeSingle();setOperator(data)}
+ async function auth(email:string,password:string,signup:boolean,nome:string){if(!supabase)return;const r=signup?await supabase.auth.signUp({email,password,options:{data:{nome}}}):await supabase.auth.signInWithPassword({email,password});setMsg(r.error?.message||"");}
+ async function resetPassword(email:string){if(!supabase||!email)return setMsg("Informe seu e-mail.");const r=await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});setMsg(r.error?.message||"Link de recuperação enviado para seu e-mail.");}
  async function doImport(){
-  if(!supabase||!file||!preview)return;
-  setLoading(true);
-  setMsg("");
-  const {data:imp,error}=await supabase.from("importacoes").insert({
-    nome_arquivo:file.name,
-    extensao:preview.ext,
-    total:preview.total,
-    validos:0,
-    duplicados:0,
-    invalidos:preview.total-preview.validos,
-    sem_telefone:0,
-    mapeamento:preview.map
-  }).select().single();
-  if(error){
-    setMsg(error.message);
-    setLoading(false);
-    return;
-  }
-  const rows=preview.rows.map((r:any)=>({
-    nome:String(r.nome||"").trim(),
-    cpf:r.cpf||null,
-    cidade:r.cidade||"",
-    uf:r.uf||"",
-    produto:r.produto||"",
-    observacao:r.observacao||"",
-    extras:r.extras||{},
-    telefone_original:r.telefone||"",
-    telefone_normalizado:phone(r.telefone||"")||null,
-    telefone2_original:r.telefone2||"",
-    telefone2_normalizado:phone(r.telefone2||"")||null
-  }));
-  const {data:result,error:rpcError}=await supabase.rpc("import_leads_batch",{
-    p_importacao_id:imp.id,
-    p_rows:rows
-  });
-  if(rpcError){
-    setMsg("Erro na importação: "+rpcError.message);
-    setLoading(false);
-    return;
-  }
-  const s=result||{};
-  setMsg("Importação concluída: "+(s.adicionados||0)+" adicionados; "+(s.duplicados||0)+" duplicados; "+(s.bloqueados||0)+" bloqueados pela Não Perturbe; "+(s.sem_telefone||0)+" sem telefone.");
-  setShowImport(false);
-  setPreview(null);
-  setFile(null);
+  if(!supabase||!file||!preview)return; setLoading(true);setMsg("");
+  const {data:imp,error}=await supabase.from("importacoes").insert({nome_arquivo:file.name,extensao:preview.ext,total:preview.total,validos:0,duplicados:0,invalidos:preview.total-preview.validos,sem_telefone:0,mapeamento:preview.map}).select().single();
+  if(error){setMsg(error.message);setLoading(false);return}
+  const rows=preview.rows.map((r:any)=>({nome:String(r.nome||"").trim(),cpf:r.cpf||null,cidade:r.cidade||"",uf:r.uf||"",produto:r.produto||"",observacao:r.observacao||"",extras:r.extras||{},telefone_original:r.telefone||"",telefone_normalizado:phone(r.telefone||"")||null,telefone2_original:r.telefone2||"",telefone2_normalizado:phone(r.telefone2||"")||null}));
+  const {data:result,error:rpcError}=await supabase.rpc("import_leads_batch",{p_importacao_id:imp.id,p_rows:rows});
+  if(rpcError){setMsg("Erro na importação: "+rpcError.message);setLoading(false);return}
+  const s=result||{};setMsg("Importação concluída: "+(s.adicionados||0)+" adicionados • "+(s.duplicados||0)+" duplicados • "+(s.bloqueados||0)+" bloqueados pela Não Perturbe • "+(s.sem_telefone||0)+" sem telefone.");
+  setShowImport(false);setPreview(null);setFile(null);await load();setLoading(false);
+ }
+ async function callResult(result:string){
+  if(!supabase||!current)return;const t=current.telefones?.[0];const now=new Date().toISOString();
+  await supabase.from("ligacoes").insert({lead_id:current.id,telefone_id:t?.id,operador_id:operator?.id,inicio:now,fim:now,resultado:result});
+  const status=result==="Retorno"?"retorno":result==="Interessado"||result==="Simulação"||result==="Proposta"||result==="Contrato"?"interessado":"finalizado";
+  await supabase.from("leads").update({status,updated_at:now}).eq("id",current.id);
+  if(result==="Retorno") await supabase.from("retornos").insert({lead_id:current.id,operador_id:operator?.id,data_hora:new Date(Date.now()+86400000).toISOString(),observacao:"Retorno criado a partir da ligação"});
   await load();
-  setLoading(false);
+ }
+ async function block(){if(!supabase||!current)return;const tel=current.telefones?.[0]?.numero_normalizado||"";await supabase.from("lista_nao_perturbe").insert({cpf:cpf(current.cpf||"")||null,telefone:phone(tel)||null,nome:current.nome,origem:"manual",motivo:"Solicitação de não contato",operador_id:operator?.id});await supabase.from("leads").update({bloqueado:true,opt_out:true,status:"bloqueado",updated_at:new Date().toISOString()}).eq("id",current.id);await load()}
+ if(!session)return <Login onAuth={auth} reset={resetPassword} msg={msg}/>;
+ return <div className="shell"><aside className="side"><div className="brand"><b>A<span>&</span>K</b><small> CALL CENTER</small></div><div className="operator"><div className="avatar">{initials(operator?.nome||session.user.email)}</div><div><b>{operator?.nome||"Operador"}</b><small>{operator?.perfil||"operador"}</small></div></div><nav className="nav">{[["dashboard","Dashboard","⌂"],["fila","Fila","☎"],["leads","Leads","◉"],["npd","Não Perturbe","⊘"]].map(([id,label,icon])=><button className={mode===id?"active":""} key={id} onClick={()=>setMode(id)}><span>{icon}</span>{label}</button>)}</nav><button className="btn primary full" onClick={()=>setShowImport(true)}>＋ Importar lista</button><button className="btn dark full" onClick={()=>supabase?.auth.signOut()}>Sair</button><div className="sidefoot">A&K Soluções Financeiras<br/><span>Soluções que fazem sentido para você.</span></div></aside>
+ <main className="main"><header className="top"><div><div className="eyebrow">CENTRAL OPERACIONAL</div><h1>{mode==="dashboard"?"Visão geral":mode==="fila"?"Fila de chamadas":mode==="leads"?"Base de leads":"Não Perturbe"}</h1><p>Controle sua operação com segurança e simplicidade.</p></div><button className="btn primary" onClick={()=>setShowImport(true)}>＋ Nova importação</button></header>
+ {mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length} loading={loading}/>}
+ {mode==="fila"&&<Queue lead={current} onCall={()=>current?.telefones?.[0]&&(window.location.href="tel:+"+current.telefones[0].numero_normalizado)} onResult={callResult} onBlock={block}/>}
+ {mode==="leads"&&<Leads leads={paged} loading={loading} search={search} setSearch={setSearch} page={page} setPage={setPage} total={filtered.length} pageSize={pageSize}/>}
+ {mode==="npd"&&<Npd rows={npd}/>}
+ {showImport&&<ImportModal file={file} setFile={async f=>{setFile(f);if(f)try{setPreview(await parseFile(f))}catch(e){setMsg("Não foi possível ler o arquivo.")}}} preview={preview} onClose={()=>{setShowImport(false);setPreview(null);setMsg("")}} onImport={doImport} loading={loading} msg={msg}/>}
+ </main></div>
 }
- async function callResult(result:string){if(!supabase||!current)return;const t=current.telefones?.[0];await supabase.from("ligacoes").insert({lead_id:current.id,telefone_id:t?.id,resultado:result,inicio:new Date().toISOString(),fim:new Date().toISOString()});await supabase.from("leads").update({status:result==="Retorno"?"retorno":result==="Interessado"?"interessado":"finalizado",updated_at:new Date().toISOString()}).eq("id",current.id);await load()}
- async function block(){if(!supabase||!current)return;await supabase.from("lista_nao_perturbe").insert({cpf:cpf(current.cpf||"")||null,telefone:phone(current.telefones?.[0]?.numero_normalizado||"")||null,nome:current.nome,origem:"manual",motivo:"Solicitação de não contato"});await supabase.from("leads").update({bloqueado:true,opt_out:true,status:"bloqueado"}).eq("id",current.id);await load()}
- if(!session)return <Login onAuth={auth} msg={msg}/>;
- return <div className="shell"><aside className="side"><div className="brand">A<span>&</span>K CALL CENTER</div><div className="nav">{[["dashboard","Dashboard"],["fila","Fila"],["leads","Leads"],["npd","Não Perturbe"]].map(([id,label])=><button className={mode===id?"active":""} key={id} onClick={()=>setMode(id)}>{label}</button>)}</div><button className="btn" style={{marginTop:20,width:"100%"}} onClick={()=>setShowImport(true)}>+ Importar lista</button><button className="btn" style={{marginTop:8,width:"100%"}} onClick={()=>supabase?.auth.signOut()}>Sair</button></aside><main className="main"><div className="top"><div className="title"><h1>{mode==="dashboard"?"Dashboard":mode==="fila"?"Fila de chamadas":mode==="leads"?"Leads":"Não Perturbe"}</h1><div className="muted">A&K Soluções Financeiras • central operacional</div></div><button className="btn primary" onClick={()=>setShowImport(true)}>+ Importar lista</button></div>{mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length}/>} {mode==="fila"&&<Queue lead={current} onCall={()=>current?.telefones?.[0]&&(window.location.href="tel:+"+current.telefones[0].numero_normalizado)} onResult={callResult} onBlock={block}/>} {mode==="leads"&&<Leads leads={leads} loading={loading}/>} {mode==="npd"&&<Npd rows={npd}/>} {showImport&&<ImportModal file={file} setFile={async f=>{setFile(f);if(f)try{setPreview(await parseFile(f))}catch{setMsg("Não foi possível ler o arquivo.")}}} preview={preview} onClose={()=>{setShowImport(false);setPreview(null)}} onImport={doImport} loading={loading} msg={msg}/>}</main></div>
+
+function Login({onAuth,reset,msg}:{onAuth:(e:string,p:string,s:boolean,n:string)=>void;reset:(e:string)=>void;msg:string}){
+ const[e,setE]=useState(""),[p,setP]=useState(""),[n,setN]=useState(""),[s,setS]=useState(false),[terms,setTerms]=useState(false);
+ return <div className="login"><div className="login-art"><div className="artcopy"><div className="logo">A<span>&</span>K</div><h1>Central de atendimento inteligente.</h1><p>Organize suas listas, chamadas, retornos e bloqueios em um único lugar.</p><div className="feature">✓ Fila operacional</div><div className="feature">✓ Não Perturbe integrado</div><div className="feature">✓ Histórico de chamadas</div></div></div><div className="loginpanel"><div className="loginbox"><div className="mobilelogo">A<span>&</span>K</div><div className="eyebrow">A&K SOLUÇÕES FINANCEIRAS</div><h2>{s?"Criar acesso":"Bem-vindo de volta"}</h2><p className="muted">{s?"O primeiro cadastro será o proprietário administrador.":"Entre com seu acesso para abrir a central."}</p>{s&&<div className="field"><label>Nome</label><input value={n} onChange={x=>setN(x.target.value)} placeholder="Seu nome"/></div>}<div className="field"><label>E-mail</label><input type="email" value={e} onChange={x=>setE(x.target.value)} placeholder="voce@empresa.com"/></div><div className="field"><label>Senha</label><input type="password" value={p} onChange={x=>setP(x.target.value)} placeholder="Mínimo recomendado: 8 caracteres"/></div>{s&&<label className="check"><input type="checkbox" checked={terms} onChange={x=>setTerms(x.target.checked)}/> <span>Li e aceito os <a href="/termos" target="_blank">Termos de Uso</a> e a <a href="/privacidade" target="_blank">Política de Privacidade</a>.</span></label>}{msg&&<div className="notice">{msg}</div>}<button disabled={s&&!terms} className="btn primary full big" onClick={()=>onAuth(e,p,s,n)}>{s?"Criar minha conta":"Entrar na central"}</button><div className="loginlinks"><button onClick={()=>setS(!s)}>{s?"Já tenho acesso":"Primeiro acesso"}</button>{!s&&<button onClick={()=>reset(e)}>Esqueci minha senha</button>}</div></div></div></div>
 }
-function Login({onAuth,msg}:{onAuth:(e:string,p:string,s?:boolean)=>void;msg:string}){const[e,setE]=useState(""),[p,setP]=useState(""),[s,setS]=useState(false);return <div className="login"><div className="loginbox"><div className="logo">A<span>&</span>K</div><h2>Call Center</h2><p className="muted">Entre para acessar sua central.</p><div className="field"><label>E-mail</label><input value={e} onChange={x=>setE(x.target.value)}/></div><div className="field"><label>Senha</label><input type="password" value={p} onChange={x=>setP(x.target.value)}/></div>{msg&&<div className="notice">{msg}</div>}<button className="btn primary" style={{width:"100%"}} onClick={()=>onAuth(e,p,s)}>{s?"Criar conta":"Entrar"}</button><button className="btn" style={{width:"100%",marginTop:8}} onClick={()=>setS(!s)}>{s?"Já tenho conta":"Primeiro acesso"}</button></div></div>}
-function Dashboard({leads,available,npd}:{leads:Lead[];available:number;npd:number}){return <div className="grid"><div className="grid cards"><Metric t="Total de leads" n={leads.length}/><Metric t="Na fila" n={available}/><Metric t="Interessados" n={leads.filter(x=>x.status==="interessado").length}/><Metric t="Não Perturbe" n={npd}/></div><div className="card"><h3>Central operacional</h3><p className="muted">Importe suas listas, respeite a Não Perturbe e registre o resultado de cada chamada.</p></div></div>}
-function Metric({t,n}:{t:string;n:number}){return <div className="card"><div className="muted">{t}</div><div className="metric">{n}</div></div>}
-function Queue({lead,onCall,onResult,onBlock}:{lead?:Lead;onCall:()=>void;onResult:(x:string)=>void;onBlock:()=>void}){if(!lead)return <div className="card empty">Fila vazia. Importe uma lista para começar.</div>;return <div className="queue"><div className="leadhero"><div className="muted" style={{color:"#cfe0ff"}}>PRÓXIMO CONTATO</div><h2>{lead.nome}</h2><div>{lead.cidade||"—"} {lead.uf&&"• "+lead.uf}</div><div className="phone">{lead.telefones?.[0]?.numero_normalizado}</div><div className="actions"><button className="btn primary" onClick={onCall}>📞 LIGAR</button><button className="btn" onClick={onBlock}>Não ligar mais</button></div></div><div className="card"><h3>Resultado</h3><div className="resultgrid">{results.map(r=><button key={r} onClick={()=>onResult(r)}>{r}</button>)}</div><p className="muted" style={{marginTop:16}}>O botão LIGAR usa tel: para entregar a chamada ao ambiente Windows/Phone Link.</p></div></div>}
-function Leads({leads,loading}:{leads:Lead[];loading:boolean}){return <div className="tablewrap"><table className="table"><thead><tr><th>Nome</th><th>Telefone</th><th>Produto</th><th>Status</th></tr></thead><tbody>{leads.map(l=><tr key={l.id}><td>{l.nome}</td><td>{l.telefones?.[0]?.numero_normalizado||"—"}</td><td>{l.produto||"—"}</td><td><span className="pill">{l.status}</span></td></tr>)}</tbody></table>{loading&&<div className="empty">Carregando...</div>}</div>}
-function Npd({rows}:{rows:any[]}){return <div className="tablewrap"><table className="table"><thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Origem</th><th>Motivo</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td>{r.nome||"—"}</td><td>{r.cpf||"—"}</td><td>{r.telefone||"—"}</td><td>{r.origem}</td><td>{r.motivo||"—"}</td></tr>)}</tbody></table>{!rows.length&&<div className="empty">Nenhum registro ativo.</div>}</div>}
-function ImportModal({file,setFile,preview,onClose,onImport,loading,msg}:{file:File|null;setFile:(f:File|null)=>void;preview:any;onClose:()=>void;onImport:()=>void;loading:boolean;msg:string}){return <div className="modal"><div className="modalbox"><div className="top"><div><h2 style={{margin:0}}>Importar lista</h2><div className="muted">XLS • XLSX • ODS • CSV • TXT</div></div><button className="btn" onClick={onClose}>Fechar</button></div><label className="drop"><input type="file" accept=".xls,.xlsx,.ods,.csv,.txt" hidden onChange={e=>setFile(e.target.files?.[0]||null)}/>{file?<b>{file.name}</b>:"Clique para selecionar o arquivo"}</label>{preview&&<><div className="notice" style={{marginTop:14}}>Encontrados {preview.total} registros; {preview.validos} com nome e telefone.</div><div className="tablewrap"><table className="table"><thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Cidade</th><th>Produto</th></tr></thead><tbody>{preview.rows.slice(0,8).map((r:any,i:number)=><tr key={i}><td>{r.nome}</td><td>{r.cpf}</td><td>{r.telefone}</td><td>{r.cidade}</td><td>{r.produto}</td></tr>)}</tbody></table></div><button disabled={loading} className="btn primary" style={{marginTop:15}} onClick={onImport}>{loading?"Importando...":"Confirmar importação"}</button></>}{msg&&<div className="notice" style={{marginTop:12}}>{msg}</div>}</div></div>}
+
+function Dashboard({leads,available,npd,loading}:{leads:Lead[];available:number;npd:number;loading:boolean}){if(loading&&!leads.length)return <div className="cards">{[1,2,3,4].map(i=><div className="card skeleton" key={i}/>)}</div>;return <div className="grid"><div className="cards"><Metric t="Total de leads" n={leads.length} icon="◎"/><Metric t="Disponíveis na fila" n={available} icon="☎"/><Metric t="Interessados" n={leads.filter(x=>x.status==="interessado").length} icon="↗"/><Metric t="Não Perturbe" n={npd} icon="⊘"/></div><div className="heroCard"><div><div className="eyebrow light">OPERAÇÃO</div><h2>Pronto para começar?</h2><p>Importe sua primeira lista e o sistema fará a triagem automática de duplicados e contatos bloqueados.</p></div><div className="heroStat"><b>{available}</b><span>na fila</span></div></div><div className="card"><div className="sectionTitle"><div><h3>Como funciona</h3><p>Fluxo simples para sua equipe.</p></div></div><div className="steps"><div><b>01</b><span>Importe a lista</span></div><div><b>02</b><span>O sistema filtra bloqueados</span></div><div><b>03</b><span>Ligue pelo Phone Link</span></div><div><b>04</b><span>Registre o resultado</span></div></div></div></div>}
+function Metric({t,n,icon}:{t:string;n:number;icon:string}){return <div className="card metricCard"><div className="metricIcon">{icon}</div><div><div className="muted">{t}</div><div className="metric">{n}</div></div></div>}
+
+function Queue({lead,onCall,onResult,onBlock}:{lead?:Lead;onCall:()=>void;onResult:(x:string)=>void;onBlock:()=>void}){if(!lead)return <div className="emptyCard"><div className="emptyIcon">☎</div><h2>Fila vazia</h2><p>Importe uma lista para colocar contatos na operação.</p></div>;return <div className="queue"><section className="leadhero"><div className="eyebrow light">PRÓXIMO CONTATO</div><div className="personAvatar">{initials(lead.nome)}</div><h2>{lead.nome}</h2><p>{lead.cidade||"Cidade não informada"} {lead.uf&&"• "+lead.uf}</p><div className="phone">{lead.telefones?.[0]?.numero_normalizado}</div><div className="actions"><button className="btn call" onClick={onCall}>☎ LIGAR AGORA</button><button className="btn ghost" onClick={onBlock}>⊘ Não ligar mais</button></div></section><section className="card"><div className="sectionTitle"><div><h3>Resultado da chamada</h3><p>Registre o resultado antes de avançar.</p></div></div><div className="resultgrid">{results.map(r=><button key={r} onClick={()=>onResult(r)}>{r}</button>)}</div><div className="info">O botão de ligação usa <b>tel:</b> e entrega a chamada ao ambiente configurado no Windows/Phone Link.</div></section></div>}
+
+function Leads({leads,loading,search,setSearch,page,setPage,total,pageSize}:{leads:Lead[];loading:boolean;search:string;setSearch:(x:string)=>void;page:number;setPage:(x:number)=>void;total:number;pageSize:number}){const pages=Math.max(1,Math.ceil(total/pageSize));return <div className="card"><div className="toolbar"><div><h3>Leads</h3><p>{total} registros encontrados</p></div><input className="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar nome, CPF, telefone, cidade..."/></div><div className="tablewrap"><table className="table"><thead><tr><th>Cliente</th><th>Telefone</th><th>Produto</th><th>Status</th></tr></thead><tbody>{leads.map(l=><tr key={l.id}><td><b>{l.nome}</b><small>{l.cpf?mask(l.cpf):"CPF não informado"}</small></td><td>{l.telefones?.[0]?.numero_normalizado||"—"}</td><td>{l.produto||"—"}</td><td><span className="pill">{l.status}</span></td></tr>)}</tbody></table>{loading&&<div className="loadingbar"/>}</div><div className="pagination"><span>Página {page} de {pages}</span><div><button disabled={page<=1} onClick={()=>setPage(page-1)}>←</button><button disabled={page>=pages} onClick={()=>setPage(page+1)}>→</button></div></div></div>}
+
+function Npd({rows}:{rows:any[]}){return <div className="card"><div className="toolbar"><div><h3>Não Perturbe</h3><p>Contatos ativos que não devem entrar na fila.</p></div><span className="pill">{rows.length} bloqueios</span></div><div className="tablewrap"><table className="table"><thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Origem</th><th>Motivo</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td>{r.nome||"—"}</td><td>{r.cpf?mask(r.cpf):"—"}</td><td>{r.telefone||"—"}</td><td>{r.origem}</td><td>{r.motivo||"—"}</td></tr>)}</tbody></table>{!rows.length&&<div className="empty">Nenhum registro ativo.</div>}</div></div>}
+
+function ImportModal({file,setFile,preview,onClose,onImport,loading,msg}:{file:File|null;setFile:(f:File|null)=>void;preview:any;onClose:()=>void;onImport:()=>void;loading:boolean;msg:string}){return <div className="modal"><div className="modalbox"><div className="top"><div><div className="eyebrow">IMPORTAÇÃO SEGURA</div><h2 style={{margin:"4px 0"}}>Adicionar lista</h2><div className="muted">XLS • XLSX • ODS • CSV • TXT</div></div><button className="btn" onClick={onClose}>Fechar</button></div><label className="drop"><input type="file" accept=".xls,.xlsx,.ods,.csv,.txt" hidden onChange={e=>setFile(e.target.files?.[0]||null)}/><span className="uploadIcon">↑</span>{file?<b>{file.name}</b>:<><b>Selecione sua planilha</b><small>Arraste ou clique para escolher o arquivo</small></>}</label>{preview&&<><div className="notice"><b>{preview.total}</b> registros lidos • <b>{preview.validos}</b> com nome e telefone. O sistema verificará duplicados e Não Perturbe no servidor.</div><div className="tablewrap preview"><table className="table"><thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Cidade</th><th>Produto</th></tr></thead><tbody>{preview.rows.slice(0,8).map((r:any,i:number)=><tr key={i}><td>{r.nome}</td><td>{r.cpf?mask(r.cpf):""}</td><td>{r.telefone}</td><td>{r.cidade}</td><td>{r.produto}</td></tr>)}</tbody></table></div><button disabled={loading} className="btn primary full big" onClick={onImport}>{loading?"Processando lista...":"Confirmar importação"}</button></>}{msg&&<div className="notice" style={{marginTop:12}}>{msg}</div>}</div></div>}
