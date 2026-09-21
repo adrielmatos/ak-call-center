@@ -8,6 +8,7 @@ type Stage={id:string;nome:string;cor:string;ordem:number};
 type Campaign={id:string;nome:string;produto?:string;status:string;created_at:string;inicio_at?:string;fim_at?:string};
 type ReturnRow={id:string;lead_id:string;operador_id?:string;data_hora:string;observacao?:string;concluido:boolean;lead?:any};
 type UserRow={id:string;nome:string;email?:string;perfil:string;ativo:boolean;auth_user_id?:string;permissoes?:Record<string,boolean>;preferencias?:Record<string,any>};
+const APP_VERSION="2.0.0";
 const results=["Interessado","Retorno","Simulação","Proposta","Contrato","Não atendeu","Não interessado","Número inválido","Sem perfil"];
 const mask=(v="")=>v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4");
 const initials=(v="")=>v.split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
@@ -236,7 +237,7 @@ async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,
    <div className="sidefoot">A&K Soluções Financeiras<br/><span>Soluções que fazem sentido para você.</span></div>
   </aside>
   <main className="content">
-   <header className="header"><div><div className="eyebrow">CENTRAL OPERACIONAL • ONLINE</div><h1>{nav.find(x=>x[0]===mode)?.[1]}</h1><p>Operação de consignado, CRM e telefonia em um único painel.</p></div><div className="headActions"><span className="online"><b/> Sistema online</span><button className="btn primary" onClick={()=>setShowImport(true)}>＋ Nova importação</button></div></header>
+   <header className="header"><div><div className="eyebrow">CENTRAL OPERACIONAL • ONLINE</div><h1>{nav.find(x=>x[0]===mode)?.[1]}</h1><p>Operação de consignado, CRM e telefonia em um único painel.</p></div><div className="headActions"><span className="online"><b/> Sistema online • v{APP_VERSION}</span><button className="btn primary" onClick={()=>setShowImport(true)}>＋ Nova importação</button></div></header>
    {error&&<div className="alert error"><b>Erro:</b> {error}<button onClick={()=>setError("")}>×</button></div>}
    {msg&&<div className="alert success">{msg}<button onClick={()=>setMsg("")}>×</button></div>}
    {mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length} campaigns={campaigns.length} loading={loading}/>}
