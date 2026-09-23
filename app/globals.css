@@ -103,3 +103,6 @@
  .sidebar nav button{min-height:46px}
 }
 .panelSubtle{margin-top:12px;padding:11px 12px;border:1px solid #e6edf4;background:#f8fafc;border-radius:10px}.panelSubtle b{font-size:10px}.panelSubtle p{margin:4px 0 0;color:var(--muted);font-size:9px;line-height:1.5}
+
+/* A&K brand lockup */
+.authBrandName{font-size:12px;font-weight:900;letter-spacing:.22em;margin-top:-2px;color:#d8e8f8}.mobileLogo .authBrandName{color:#0d1c2d;font-size:9px;letter-spacing:.18em;margin-bottom:10px}.mobileLogo .heroLogo{font-size:30px}.authHero .heroLogo{margin-bottom:0}
