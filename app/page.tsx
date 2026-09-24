@@ -61,13 +61,14 @@ export default function Home(){
     if(["resultados","relatorios"].includes(targetMode))
       jobs.push(supabase.from("ligacoes").select("id,lead_id,operador_id,telefone_id,inicio,fim,resultado,observacao,created_at,leads(id,nome,cpf)").order("created_at",{ascending:false}).limit(1000).then(x=>["calls",x]));
     const results=await Promise.all(jobs);
+    let loadedLeads:Lead[]=[];
     for(const [key,res] of results){
       if(res.error){setError(res.error.message);continue}
-      if(key==="leads")setLeads((res.data||[]) as Lead[]);
+      if(key==="leads"){loadedLeads=(res.data||[]) as Lead[];setLeads(loadedLeads);}
       if(key==="npd")setNpd(res.data||[]);
       if(key==="stages")setStages(res.data||[]);
       if(key==="campaigns")setCampaigns((res.data||[]) as Campaign[]);
-      if(key==="returns")setReturns((res.data||[]) as ReturnRow[]);
+      if(key==="returns")setReturns((res.data||[]).map((r:any)=>({...r,lead:r.lead||loadedLeads.find((l:Lead)=>l.id===r.lead_id)||null})) as ReturnRow[]);
       if(key==="calls")setCalls(res.data||[]);
     }
   }catch(e:any){setError("Não foi possível atualizar os dados.");}
