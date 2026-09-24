@@ -49,18 +49,22 @@ export async function parseFile(file:File){
   const map:any = {};
   Object.keys(aliases).forEach(k => map[k] = find(aliases[k]));
 
-  const parsed = rows.map(r => ({
-    nome: map.nome ? String(r[map.nome] ?? "").trim() : "",
-    cpf: cpf(map.cpf ? r[map.cpf] : ""),
-    telefone: phone(map.telefone ? r[map.telefone] : ""),
-    telefone2: phone(map.telefone2 ? r[map.telefone2] : ""),
-    cidade: map.cidade ? String(r[map.cidade] ?? "").trim() : "",
-    uf: map.uf ? String(r[map.uf] ?? "").trim().toUpperCase() : "",
-    banco: map.banco ? String(r[map.banco] ?? "").trim() : "",
-    produto: map.produto ? String(r[map.produto] ?? "").trim() : "",
-    observacao: map.observacao ? String(r[map.observacao] ?? "").trim() : "",
-    extras: Object.fromEntries(Object.entries(r).filter(([k]) => !Object.values(map).includes(k)))
-  }));
+  const parsed = rows.map(r => {
+    const extras = Object.fromEntries(Object.entries(r).filter(([k]) => !Object.values(map).includes(k)));
+    const banco = map.banco ? String(r[map.banco] ?? "").trim() : "";
+    return {
+      nome: map.nome ? String(r[map.nome] ?? "").trim() : "",
+      cpf: cpf(map.cpf ? r[map.cpf] : ""),
+      telefone: phone(map.telefone ? r[map.telefone] : ""),
+      telefone2: phone(map.telefone2 ? r[map.telefone2] : ""),
+      cidade: map.cidade ? String(r[map.cidade] ?? "").trim() : "",
+      uf: map.uf ? String(r[map.uf] ?? "").trim().toUpperCase() : "",
+      banco,
+      produto: map.produto ? String(r[map.produto] ?? "").trim() : "",
+      observacao: map.observacao ? String(r[map.observacao] ?? "").trim() : "",
+      extras: banco ? {...extras,banco} : extras
+    };
+  });
 
   return {ext, cols, map, rows:parsed, total:parsed.length, validos:parsed.filter(x => x.nome && (x.telefone || x.telefone2)).length};
 }
