@@ -11,8 +11,7 @@ export const phone = (v:any) => {
 };
 export const cpf = (v:any) => digits(v);
 
-const norm = (v:any) =>
-  String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+const norm = (v:any) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
 const aliases:any = {
   nome:["nome","cliente","beneficiario","beneficiário","name"],
@@ -21,6 +20,7 @@ const aliases:any = {
   telefone2:["telefone2","celular2","fone2"],
   cidade:["cidade","municipio","município"],
   uf:["uf","estado"],
+  banco:["banco","banco atual","banco_atual","instituicao","instituição","instituicao financeira","instituição financeira","bank"],
   produto:["produto","modalidade"],
   observacao:["observacao","observação","obs"]
 };
@@ -36,9 +36,8 @@ function parseCsv(text:string) {
 export async function parseFile(file:File){
   const ext = file.name.split(".").pop()?.toLowerCase() || "";
   let rows:any[] = [];
-  if(ext === "csv" || ext === "txt") {
-    rows = parseCsv(await file.text());
-  } else {
+  if(ext === "csv" || ext === "txt") rows = parseCsv(await file.text());
+  else {
     const wb = XLSX.read(await file.arrayBuffer(), {type:"array", cellDates:true});
     const first = wb.SheetNames[0];
     if(!first) throw new Error("A planilha não possui abas.");
@@ -57,13 +56,11 @@ export async function parseFile(file:File){
     telefone2: phone(map.telefone2 ? r[map.telefone2] : ""),
     cidade: map.cidade ? String(r[map.cidade] ?? "").trim() : "",
     uf: map.uf ? String(r[map.uf] ?? "").trim().toUpperCase() : "",
+    banco: map.banco ? String(r[map.banco] ?? "").trim() : "",
     produto: map.produto ? String(r[map.produto] ?? "").trim() : "",
     observacao: map.observacao ? String(r[map.observacao] ?? "").trim() : "",
     extras: Object.fromEntries(Object.entries(r).filter(([k]) => !Object.values(map).includes(k)))
   }));
 
-  return {
-    ext, cols, map, rows:parsed, total:parsed.length,
-    validos:parsed.filter(x => x.nome && (x.telefone || x.telefone2)).length
-  };
+  return {ext, cols, map, rows:parsed, total:parsed.length, validos:parsed.filter(x => x.nome && (x.telefone || x.telefone2)).length};
 }
