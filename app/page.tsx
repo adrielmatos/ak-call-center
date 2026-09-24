@@ -38,23 +38,41 @@ export default function Home(){
   });
   return()=>{alive=false;data.subscription.unsubscribe()};
  },[]);
- useEffect(()=>{if(session){load();loadOperator()}},[session]);
+ useEffect(()=>{if(session)loadOperator()},[session]);
  useEffect(()=>setPage(1),[search]);
+ useEffect(()=>{if(session)load(mode)},[mode]);
 
- async function load(){
+ async function load(targetMode=mode){
   if(!supabase)return;
   setLoading(true);setError("");
-  const [a,b,c,d,e,f]=await Promise.all([
-   supabase.from("leads").select("*,telefones(id,numero_normalizado)").order("prioridade",{ascending:false}).order("created_at",{ascending:false}).limit(1000),
-   supabase.from("lista_nao_perturbe").select("*").eq("ativo",true).order("data_bloqueio",{ascending:false}).limit(1000),
-   supabase.from("crm_etapas").select("*").eq("ativo",true).order("ordem"),
-   supabase.from("campanhas").select("*").neq("status","removida").order("created_at",{ascending:false}).limit(100),
-   supabase.from("retornos").select("*,leads(id,nome,cpf,cidade,uf,produto,telefones(id,numero_normalizado))").eq("concluido",false).order("data_hora",{ascending:true}).limit(2000),
-   supabase.from("ligacoes").select("*,leads(id,nome,cpf)").order("created_at",{ascending:false}).limit(5000)
-  ]);
-  const first=a.error||b.error||c.error||d.error||e.error||f.error;
-  if(first)setError(first.message);
-  setLeads((a.data||[]) as Lead[]);setNpd(b.data||[]);setStages(c.data||[]);setCampaigns((d.data||[]) as Campaign[]);setReturns((e.data||[]) as ReturnRow[]);setCalls(f.data||[]);setLoading(false);
+  try{
+    const leadSelect="id,nome,cpf,cidade,uf,produto,status,prioridade,bloqueado,opt_out,created_at,updated_at,telefones(id,numero_normalizado)";
+    const jobs:any[]=[];
+    if(["dashboard","discador","crm","leads","retornos","resultados","relatorios"].includes(targetMode))
+      jobs.push(supabase.from("leads").select(leadSelect).order("prioridade",{ascending:false}).order("created_at",{ascending:false}).limit(1000).then(x=>["leads",x]));
+    if(["dashboard","npd"].includes(targetMode))
+      jobs.push(supabase.from("lista_nao_perturbe").select("id,cpf,telefone,nome,origem,motivo,ativo,data_bloqueio").eq("ativo",true).order("data_bloqueio",{ascending:false}).limit(500).then(x=>["npd",x]));
+    if(["dashboard","crm","resultados","leads"].includes(targetMode))
+      jobs.push(supabase.from("crm_etapas").select("id,nome,cor,ordem").eq("ativo",true).order("ordem").then(x=>["stages",x]));
+    if(["dashboard","campanhas"].includes(targetMode))
+      jobs.push(supabase.from("campanhas").select("id,nome,produto,status,created_at,inicio_at,fim_at").neq("status","removida").order("created_at",{ascending:false}).limit(100).then(x=>["campaigns",x]));
+    if(["dashboard","retornos","crm"].includes(targetMode))
+      jobs.push(supabase.from("retornos").select("id,lead_id,operador_id,data_hora,observacao,concluido,leads(id,nome,cpf,cidade,uf,produto,telefones(id,numero_normalizado))").eq("concluido",false).order("data_hora",{ascending:true}).limit(500).then(x=>["returns",x]));
+    if(["resultados","relatorios"].includes(targetMode))
+      jobs.push(supabase.from("ligacoes").select("id,lead_id,operador_id,telefone_id,inicio,fim,resultado,observacao,created_at,leads(id,nome,cpf)").order("created_at",{ascending:false}).limit(1000).then(x=>["calls",x]));
+    const results=await Promise.all(jobs);
+    let loadedLeads:Lead[]=[];
+    for(const [key,res] of results){
+      if(res.error){setError(res.error.message);continue}
+      if(key==="leads"){loadedLeads=(res.data||[]) as Lead[];setLeads(loadedLeads);}
+      if(key==="npd")setNpd(res.data||[]);
+      if(key==="stages")setStages(res.data||[]);
+      if(key==="campaigns")setCampaigns((res.data||[]) as Campaign[]);
+      if(key==="returns")setReturns((res.data||[]).map((r:any)=>({...r,lead:r.lead||loadedLeads.find((l:Lead)=>l.id===r.lead_id)||null})) as ReturnRow[]);
+      if(key==="calls")setCalls(res.data||[]);
+    }
+  }catch(e:any){setError("Não foi possível atualizar os dados.");}
+  finally{setLoading(false)}
 }
   async function loadOperator(){
   if(!supabase||!session?.user?.id)return;
@@ -326,10 +344,21 @@ function Campaigns({rows,onCreate,onToggle,onDelete}:{rows:Campaign[];onCreate:(
 }
 function Returns({rows,onOpenLead,onSave,onConclude}:{rows:ReturnRow[];onOpenLead:(l:Lead)=>void;onSave:(id:string,d:{data_hora:string;observacao:string})=>void;onConclude:(r:ReturnRow)=>void}){
  const[month,setMonth]=useState(new Date().toISOString().slice(0,7)),[day,setDay]=useState<number|null>(null),[edit,setEdit]=useState<ReturnRow|null>(null),[dateTime,setDateTime]=useState(""),[obs,setObs]=useState("");
- const monthRows=rows.filter(r=>r.data_hora.slice(0,7)===month), selected=day?monthRows.filter(r=>new Date(r.data_hora).getDate()===day):monthRows;
- const first=new Date(month+"-01T00:00:00"), start=(first.getDay()+6)%7, days=new Date(first.getFullYear(),first.getMonth()+1,0).getDate();
+ const monthRows=rows.filter(r=>r.data_hora.slice(0,7)===month),selected=day?monthRows.filter(r=>new Date(r.data_hora).getDate()===day):monthRows;
+ const first=new Date(month+"-01T00:00:00"),start=(first.getDay()+6)%7,days=new Date(first.getFullYear(),first.getMonth()+1,0).getDate();
  const openEdit=(r:ReturnRow)=>{setEdit(r);const d=new Date(r.data_hora);setDateTime(new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16));setObs(r.observacao||"")};
- return <div className="stack"><div className="panel"><div className="toolbar"><PanelTitle title="Retornos" subtitle="Calendário dos próximos contatos e fila de retorno."/><input className="monthInput" type="month" value={month} onChange={e=>{setMonth(e.target.value);setDay(null)}}/></div><div className="calendar"><div className="calendarHead">{["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"].map(x=><b key={x}>{x}</b>)}</div><div className="calendarGrid">{Array.from({length:start}).map((_,i)=><span className="calendarBlank" key={"b"+i}/>) }{Array.from({length:days}).map((_,i)=>{const d=i+1,count=monthRows.filter(r=>new Date(r.data_hora).getDate()===d).length;return <button key={d} className={day===d?"calendarDay selectedDay":"calendarDay"} onClick={()=>setDay(day===d?null:d)}><b>{d}</b>{count>0&&<span>{count}</span>}</button>})}</div></div></div><div className="panel"><PanelTitle title={day?"Retornos do dia "+day:"Todos os retornos do mês"} subtitle={selected.length+" retorno(s) pendente(s)."}/><div className="tableWrap"><table><thead><tr><th>Data/hora</th><th>Cliente</th><th>Telefone</th><th>Observação</th><th>Ações</th></tr></thead><tbody>{selected.map(r=>{const l=r.lead||{};return <tr key={r.id}><td><b>{new Date(r.data_hora).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}</b></td><td><button className="linkBtn" onClick={()=>l.id&&onOpenLead(l as Lead)}>{l.nome||r.lead_id}</button></td><td>{l.telefones?.[0]?.numero_normalizado?<><a className="tableBtn" href={"tel:+"+l.telefones?.[0]?.numero_normalizado}>☎ Retornar</a>{whatsappHref(l.telefones?.[0]?.numero_normalizado)&&<a className="tableBtn" href={whatsappHref(l.telefones?.[0]?.numero_normalizado)} target="_blank" rel="noreferrer">◉ WhatsApp</a>}</>:"—"}</td><td>{r.observacao||"—"}</td><td><div className="rowActions"><button className="tableBtn" onClick={()=>openEdit(r)}>Reagendar</button><button className="tableBtn" onClick={()=>onConclude(r)}>Concluir</button></div></td></tr>})}</tbody></table>{!selected.length&&<Empty title="Nenhum retorno" text="Use Agendar retorno no Discador para criar o próximo contato."/>}</div></div>{edit&&<div className="modal" onClick={()=>setEdit(null)}><div className="modalBox smallModal" onClick={e=>e.stopPropagation()}><div className="toolbar"><div><div className="eyebrow">RETORNO</div><h2>Reagendar</h2><p>{edit.lead?.nome||"Cliente"}</p></div><button className="btn" onClick={()=>setEdit(null)}>Fechar</button></div><div className="field"><label>Data e hora</label><input type="datetime-local" value={dateTime} onChange={e=>setDateTime(e.target.value)}/></div><div className="field"><label>Observação</label><textarea className="textarea" value={obs} onChange={e=>setObs(e.target.value)}/></div><button className="btn primary full big" onClick={()=>{onSave(edit.id,{data_hora:dateTime,observacao:obs});setEdit(null)}}>Salvar retorno</button></div></div>}</div>
+ return <div className="stack">
+  <div className="panel"><div className="toolbar"><PanelTitle title="Retornos" subtitle="Calendário dos próximos contatos e fila de retorno."/><input className="monthInput" type="month" value={month} onChange={e=>{setMonth(e.target.value);setDay(null)}}/></div>
+   <div className="calendar"><div className="calendarHead">{["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"].map(x=><b key={x}>{x}</b>)}</div><div className="calendarGrid">{Array.from({length:start}).map((_,i)=><span className="calendarBlank" key={"b"+i}/>) }{Array.from({length:days}).map((_,i)=>{const d=i+1,count=monthRows.filter(r=>new Date(r.data_hora).getDate()===d).length;return <button key={d} className={day===d?"calendarDay selectedDay":"calendarDay"} onClick={()=>setDay(day===d?null:d)}><b>{d}</b>{count>0&&<span>{count}</span>}</button>})}</div></div>
+  </div>
+  <div className="panel"><PanelTitle title={day?"Retornos do dia "+day:"Todos os retornos do mês"} subtitle={selected.length+" retorno(s) pendente(s)."}/><div className="tableWrap"><table><thead><tr><th>Data/hora</th><th>Cliente</th><th>Telefone</th><th>Observação</th><th>Ações</th></tr></thead><tbody>
+   {selected.map(r=>{const l=r.lead||{};return <tr key={r.id}><td><b>{new Date(r.data_hora).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}</b></td>
+    <td><button className="linkBtn" onClick={()=>l.id&&onOpenLead(l as Lead)}><b>{l.nome||"Cliente não identificado"}</b><small className="tableMeta">ID: {r.lead_id.slice(0,8)}…</small></button></td>
+    <td>{l.telefones?.[0]?.numero_normalizado?<div className="rowActions"><a className="tableBtn" href={"tel:+"+l.telefones[0].numero_normalizado}>☎ Ligar</a>{whatsappHref(l.telefones[0].numero_normalizado)&&<a className="tableBtn" href={whatsappHref(l.telefones[0].numero_normalizado)} target="_blank" rel="noreferrer">◉ WhatsApp</a>}</div>:"Sem telefone"}</td>
+    <td>{r.observacao||"—"}</td><td><div className="rowActions"><button className="tableBtn" onClick={()=>openEdit(r)}>Reagendar</button><button className="tableBtn" onClick={()=>onConclude(r)}>Concluir</button></div></td></tr>})}
+  </tbody></table>{!selected.length&&<Empty title="Nenhum retorno" text="Use Agendar retorno no Discador para criar o próximo contato."/>}</div></div>
+  {edit&&<div className="modal" onClick={()=>setEdit(null)}><div className="modalBox smallModal" onClick={e=>e.stopPropagation()}><div className="toolbar"><div><div className="eyebrow">RETORNO</div><h2>Reagendar</h2><p>{edit.lead?.nome||"Cliente"}</p></div><button className="btn" onClick={()=>setEdit(null)}>Fechar</button></div><div className="field"><label>Data e hora</label><input type="datetime-local" value={dateTime} onChange={e=>setDateTime(e.target.value)}/></div><div className="field"><label>Observação</label><textarea className="textarea" value={obs} onChange={e=>setObs(e.target.value)}/></div><button className="btn primary full big" onClick={()=>{onSave(edit.id,{data_hora:dateTime,observacao:obs});setEdit(null)}}>Salvar retorno</button></div></div>}
+ </div>
 }
 function Telephony({config,onSave}:{config:any;onSave:(d:any)=>void}){
  const[form,setForm]=useState<any>(()=>({modo:config?.modo||"preview",chamadas_simultaneas:config?.chamadas_simultaneas||1,retentativas:config?.retentativas||2,intervalo_segundos:config?.intervalo_segundos||30,ativo:config?.ativo??true,regras:config?.regras||{sip_host:"",ramal:"",fila:"",ura:"",horario:"",gravacao:true,monitoria:true}}));
