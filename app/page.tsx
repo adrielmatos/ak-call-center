@@ -38,7 +38,7 @@ export default function Home(){
   });
   return()=>{alive=false;data.subscription.unsubscribe()};
  },[]);
- useEffect(()=>{if(session){load(mode);loadOperator()}},[session]);
+ useEffect(()=>{if(session)loadOperator()},[session]);
  useEffect(()=>setPage(1),[search]);
  useEffect(()=>{if(session)load(mode)},[mode]);
 
