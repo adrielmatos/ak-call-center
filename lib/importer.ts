@@ -20,7 +20,7 @@ const aliases:any = {
   telefone2:["telefone2","celular2","fone2"],
   cidade:["cidade","municipio","município"],
   uf:["uf","estado"],
-  banco:["banco","banco atual","banco_atual","instituicao","instituição","instituicao financeira","instituição financeira","bank"],
+  banco:["banco","banco atual","banco_atual","banco do beneficio","banco do benefício","instituicao","instituição","instituicao financeira","instituição financeira","bank"],
   produto:["produto","modalidade"],
   observacao:["observacao","observação","obs"]
 };
@@ -53,6 +53,8 @@ export async function parseFile(file:File){
     const extras = Object.fromEntries(Object.entries(r).filter(([k]) => !Object.values(map).includes(k)));
     const banco = map.banco ? String(r[map.banco] ?? "").trim() : "";
     const produtoBase = map.produto ? String(r[map.produto] ?? "").trim() : "";
+    // O preview do importador usa `produto`; portanto o banco é incorporado
+    // explicitamente na apresentação e também preservado em `extras.banco`.
     const produto = [produtoBase, banco ? "Banco: " + banco : ""].filter(Boolean).join(" • ");
     return {
       nome: map.nome ? String(r[map.nome] ?? "").trim() : "",
