@@ -33,6 +33,15 @@ function parseCsv(text:string) {
   return (r.data || []) as any[];
 }
 
+function serializeExtraValue(value:any) {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object") {
+    try { return JSON.stringify(value); } catch { return String(value); }
+  }
+  return String(value);
+}
+
 export async function parseFile(file:File){
   const ext = file.name.split(".").pop()?.toLowerCase() || "";
   let rows:any[] = [];
@@ -50,12 +59,23 @@ export async function parseFile(file:File){
   Object.keys(aliases).forEach(k => map[k] = find(aliases[k]));
 
   const parsed = rows.map(r => {
-    const extras = Object.fromEntries(Object.entries(r).filter(([k]) => !Object.values(map).includes(k)));
+    // Preserva TODAS as colunas originais da planilha. Campos conhecidos continuam
+    // normalizados para o fluxo operacional, enquanto nenhum campo desconhecido é perdido.
+    const extras:any = Object.fromEntries(
+      Object.entries(r).map(([key,value]) => [key, serializeExtraValue(value)])
+    );
     const banco = map.banco ? String(r[map.banco] ?? "").trim() : "";
     const produtoBase = map.produto ? String(r[map.produto] ?? "").trim() : "";
-    // Mantemos banco como dado próprio e também no texto de produto porque o preview atual
-    // da importação exibe a coluna Produto. Assim o banco fica visível antes do clique em Importar.
     const produto = [produtoBase, banco ? "Banco: " + banco : ""].filter(Boolean).join(" • ");
+
+    // Metadados do importador ficam em chaves próprias sem apagar os valores originais.
+    extras._importacao = {
+      banco,
+      produto_original: produtoBase,
+      colunas: cols.length,
+      origem: file.name
+    };
+
     return {
       nome: map.nome ? String(r[map.nome] ?? "").trim() : "",
       cpf: cpf(map.cpf ? r[map.cpf] : ""),
@@ -66,7 +86,7 @@ export async function parseFile(file:File){
       banco,
       produto,
       observacao: map.observacao ? String(r[map.observacao] ?? "").trim() : "",
-      extras: banco ? {...extras,banco} : extras
+      extras
     };
   });
 
