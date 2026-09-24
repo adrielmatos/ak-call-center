@@ -4,21 +4,34 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 export async function createClient() {
-  const store=await cookies();
-  const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if(!url||!key) throw new Error("Supabase não configurado.");
-  return createServerClient(url,key,{
-    cookies:{
-      getAll:()=>store.getAll(),
-      setAll(values){try{values.forEach(({name,value,options})=>store.set(name,value,options));}catch{}}
-    }
+  const store = await cookies();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) throw new Error("Supabase não configurado.");
+
+  return createServerClient(url, key, {
+    cookies: {
+      getAll: () => store.getAll(),
+      setAll(values) {
+        try {
+          values.forEach(({ name, value, options }) => store.set(name, value, options));
+        } catch {
+          // Server Components podem não permitir escrita de cookies.
+        }
+      },
+    },
   });
 }
 
+// Compatibilidade com as rotas existentes. Não altera o fluxo de autenticação.
+export const createServerSupabaseClient = createClient;
+
 export function createServiceClient() {
-  const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if(!url||!key) throw new Error("Supabase service client não configurado.");
-  return createSupabaseClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}});
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Supabase service client não configurado.");
+
+  return createSupabaseClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
