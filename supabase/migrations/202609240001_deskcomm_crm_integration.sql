@@ -74,4 +74,4 @@ drop policy if exists crm_automacao_execucoes_active on public.crm_automacao_exe
 create policy crm_automacao_execucoes_active on public.crm_automacao_execucoes for all to authenticated using((select private.current_operator_is_admin())) with check((select private.current_operator_is_admin()));
 create or replace function private.touch_crm_updated_at() returns trigger language plpgsql set search_path=public as $$ begin new.updated_at=now(); return new; end; $$;
 drop trigger if exists trg_crm_conversas_updated on public.crm_conversas; create trigger trg_crm_conversas_updated before update on public.crm_conversas for each row execute function private.touch_crm_updated_at();
-drop trigger if exists trg_crm_tarefas_updated on public.crm_tarefas; create trigger trg_crm_tarefas_updated before update on public.crm_tarefas for each row execute function private.touch_crm_tarefas_updated();
+drop trigger if exists trg_crm_tarefas_updated on public.crm_tarefas; create trigger trg_crm_tarefas_updated before update on public.crm_tarefas for each row execute function private.touch_crm_updated_at();
