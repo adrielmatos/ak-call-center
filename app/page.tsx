@@ -40,6 +40,7 @@ export default function Home(){
  },[]);
  useEffect(()=>{if(session){load(mode);loadOperator()}},[session]);
  useEffect(()=>setPage(1),[search]);
+ useEffect(()=>{if(session)load(mode)},[mode]);
 
  async function load(targetMode=mode){
   if(!supabase)return;
