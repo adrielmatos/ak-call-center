@@ -52,6 +52,8 @@ export async function parseFile(file:File){
   const parsed = rows.map(r => {
     const extras = Object.fromEntries(Object.entries(r).filter(([k]) => !Object.values(map).includes(k)));
     const banco = map.banco ? String(r[map.banco] ?? "").trim() : "";
+    const produtoBase = map.produto ? String(r[map.produto] ?? "").trim() : "";
+    const produto = [produtoBase, banco ? "Banco: " + banco : ""].filter(Boolean).join(" • ");
     return {
       nome: map.nome ? String(r[map.nome] ?? "").trim() : "",
       cpf: cpf(map.cpf ? r[map.cpf] : ""),
@@ -60,7 +62,7 @@ export async function parseFile(file:File){
       cidade: map.cidade ? String(r[map.cidade] ?? "").trim() : "",
       uf: map.uf ? String(r[map.uf] ?? "").trim().toUpperCase() : "",
       banco,
-      produto: map.produto ? String(r[map.produto] ?? "").trim() : "",
+      produto,
       observacao: map.observacao ? String(r[map.observacao] ?? "").trim() : "",
       extras: banco ? {...extras,banco} : extras
     };
