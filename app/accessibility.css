@@ -1,0 +1,75 @@
+/* A&K Accessibility Typography
+   Increase legibility without changing layout, spacing, colors or behavior. */
+
+html { font-size: 16px; }
+
+/* Primary navigation and controls */
+.sidebar nav button { font-size: 13px; }
+.sidebar nav button i { font-size: 14px; }
+.btn { font-size: 13px; }
+.operator b { font-size: 13px; }
+.operator small, .sidefoot { font-size: 11px; }
+.online, .eyebrow { font-size: 11px; }
+.alert { font-size: 13px; }
+
+/* Dashboard and operational cards */
+.header p, .heroPanel p, .panelTitle p, .toolbar p { font-size: 13px; }
+.metric span, .metric small { font-size: 12px; }
+.panelTitle h3, .toolbar h3 { font-size: 16px; }
+.flow b { font-size: 11px; }
+.flow span { font-size: 13px; }
+.flow small { font-size: 11px; }
+.modeBar b { font-size: 13px; }
+.modeBar small { font-size: 12px; }
+.modeBtns button { font-size: 12px; }
+
+/* Dialer */
+.dialHeader { font-size: 12px; }
+.person p { font-size: 13px; }
+.resultGrid button { font-size: 12px; }
+.info, .notice { font-size: 12px; }
+
+/* Tables, lists and filters */
+.search { font-size: 13px; }
+.tableWrap th, .tableWrap td { font-size: 13px; }
+.tableWrap th { font-size: 11px; }
+.tableWrap td small { font-size: 11px; }
+.pill { font-size: 11px; }
+.tableBtn { font-size: 11px; }
+.pagination { font-size: 12px; }
+
+/* CRM / Kanban / campaigns */
+.kanbanHead { font-size: 12px; }
+.leadCard b { font-size: 12px; }
+.leadCard small { font-size: 10px; }
+.emptyCol { font-size: 11px; }
+.campaignCard b { font-size: 13px; }
+.campaignCard small { font-size: 11px; }
+.featureTop span { font-size: 11px; }
+.feature p { font-size: 13px; }
+.barRow { font-size: 12px; }
+.barRow b { font-size: 12px; }
+.empty b { font-size: 14px; }
+.empty span { font-size: 12px; }
+
+/* Customer drawer / forms / import */
+.drawer p { font-size: 13px; }
+.drawerSection>b { font-size: 11px; }
+.drawerSection button { font-size: 12px; }
+.drop small { font-size: 11px; }
+.field label { font-size: 12px; }
+.check { font-size: 11px; }
+
+/* Login */
+.authHero p, .auth small { font-size: 13px; }
+
+/* Do not enlarge decorative counters/icons. */
+.metric strong, .bigNumber, .person h2, .dialNumber, .drawer h2, .drawerPhone { text-rendering: optimizeLegibility; }
+
+/* Mobile: retain the existing responsive structure while keeping text readable. */
+@media (max-width: 700px) {
+  .sidebar nav button { font-size: 13px; }
+  .content { padding: 20px 16px; }
+  .header p, .panelTitle p, .toolbar p { font-size: 13px; }
+  .tableWrap th, .tableWrap td { font-size: 12px; }
+}
