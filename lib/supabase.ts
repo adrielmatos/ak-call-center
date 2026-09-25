@@ -1,5 +1,15 @@
-export { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 
-// Compatibilidade: o cliente `supabase` não é criado durante o import.
-// Isso evita inicialização do Supabase durante prerender/build do Next.js.
-// Use createClient() dentro de Client Components quando precisar do browser client.
+/**
+ * Compatibilidade legada com os módulos que ainda importam `supabase`.
+ * O cliente real só é criado quando uma propriedade é acessada, evitando
+ * inicialização do Supabase durante o prerender/build do Next.js.
+ */
+export { createClient };
+
+export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+  get(_target, property, receiver) {
+    const client = createClient();
+    return Reflect.get(client, property, receiver);
+  },
+});
