@@ -7,15 +7,15 @@ import { cookies } from "next/headers";
 function getPublicConfig() {
   return {
     url: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    key: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "",
+    // Compatibilidade com projetos que ainda possuem a variável anon antiga.
+    key:
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      "",
   };
 }
 
-export async function createClient() {
-  const store = await cookies();
-  const { url, key } = getPublicConfig();
-  if (!url || !key) throw new Error("Supabase não configurado.");
-
+function createSafeServerClient(url: string, key: string, store: Awaited<ReturnType<typeof cookies>>) {
   return createServerClient(url, key, {
     cookies: {
       getAll: () => store.getAll(),
@@ -30,7 +30,23 @@ export async function createClient() {
   });
 }
 
-// Compatibilidade com as rotas existentes.
+export async function createClient() {
+  const store = await cookies();
+  const { url, key } = getPublicConfig();
+
+  if (!url || !key) {
+    // O Next pode avaliar módulos server durante o build/prerender.
+    // Nunca tente acessar Supabase nesse momento e nunca exponha segredo.
+    if (process.env.NEXT_PHASE === "phase-production-build") {
+      return createSafeServerClient("https://placeholder.invalid", "build-placeholder", store);
+    }
+    throw new Error("Supabase não configurado.");
+  }
+
+  return createSafeServerClient(url, key, store);
+}
+
+// Compatibilidade com rotas existentes.
 export const createServerSupabaseClient = createClient;
 
 export function createServiceClient() {
