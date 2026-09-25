@@ -21,7 +21,7 @@ jobs:
           set -euo pipefail
           go install github.com/zricethezav/gitleaks/v8@v8.24.2
           "$(go env GOPATH)/bin/gitleaks" detect --source . --config .gitleaks.toml --redact --verbose --exit-code 1
-          if git grep -nEI 'VERCEL_TOKEN|OPENAI_API_KEY|NEXT_PUBLIC_(SERVICE_ROLE|SECRET)|sb_(anon|service_role)_' -- ':!package-lock.json' ':!pnpm-lock.yaml' ':!yarn.lock'; then
+          if git grep -nEI 'VERCEL_TOKEN|OPENAI_API_KEY|NEXT_PUBLIC_(SERVICE_ROLE|SECRET)|sb_(anon|service_role)_' -- ':!package-lock.json' ':!pnpm-lock.yaml' ':!yarn.lock' ':!.github/workflows/security-scan.yml'; then
             echo "::error::Potential secret pattern found in tracked files."
             exit 1
           fi
