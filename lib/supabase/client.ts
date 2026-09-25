@@ -8,7 +8,12 @@ let browserClient: SupabaseClient | null = null;
 function getConfig() {
   return {
     url: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    key: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "",
+    // Aceita a variável atual (publishable) e a variável anon usada por
+    // instalações Supabase mais antigas. Nenhuma service_role é aceita aqui.
+    key:
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      "",
   };
 }
 
@@ -23,5 +28,5 @@ export function createClient(): SupabaseClient | null {
   return browserClient;
 }
 
-// Não inicializar durante SSR/prerender. O cliente só existe no navegador.
+// Não inicializa durante SSR/prerender. O singleton nasce apenas no browser.
 export const supabase: SupabaseClient | null = createClient();
