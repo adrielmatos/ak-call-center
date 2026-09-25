@@ -34,6 +34,8 @@ function findPhone(): string {
   return digits(node?.textContent || "");
 }
 
+const cacheKey = (phone: string) => `ak:bank:${phone}`;
+
 export default function BankBadge() {
   useEffect(() => {
     let disposed = false;
@@ -71,11 +73,43 @@ export default function BankBadge() {
       target.insertAdjacentElement("afterend", badge);
     };
 
+    const readCache = (phone: string) => {
+      try {
+        return sessionStorage.getItem(cacheKey(phone)) || "";
+      } catch {
+        return "";
+      }
+    };
+
+    const writeCache = (phone: string, bank: string) => {
+      if (!phone || !bank) return;
+      try {
+        sessionStorage.setItem(cacheKey(phone), bank);
+      } catch {
+        // Cache is an optimization only; database remains the source of truth.
+      }
+    };
+
     const load = async () => {
       const phone = findPhone();
-      if (!phone || phone === lastPhone || !supabase) return;
+      if (!phone) {
+        lastPhone = "";
+        clearBadge();
+        return;
+      }
+
+      const badgeExists = Boolean(document.querySelector("[data-ak-bank-badge]"));
+      if (phone === lastPhone && badgeExists) return;
       lastPhone = phone;
-      clearBadge();
+
+      const cachedBank = readCache(phone);
+      if (cachedBank) render(cachedBank);
+      else clearBadge();
+
+      // When returning from CRM, the component can remain mounted and the
+      // same phone can come back without a new component lifecycle. We must
+      // still restore the badge instead of skipping because the phone is the same.
+      if (!supabase) return;
 
       const { data: phones, error: phoneError } = await supabase
         .from("telefones")
@@ -93,7 +127,9 @@ export default function BankBadge() {
         .maybeSingle();
 
       if (disposed || leadError) return;
-      render(extractBank(lead));
+      const bank = extractBank(lead);
+      writeCache(phone, bank);
+      render(bank);
     };
 
     const schedule = () => {
