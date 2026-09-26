@@ -1,0 +1,21 @@
+/* Acessibilidade operacional: aumenta a leitura sem alterar a estrutura do sistema. */
+html{font-size:16px}
+body{font-size:15px}
+.sidebar nav button{font-size:14px;padding:11px 10px}
+.sidebar nav button i{font-size:16px}
+.brand b{font-size:30px}.brand small{font-size:11px}.operator b{font-size:14px}.operator small{font-size:12px}
+.header h1{font-size:32px}.header p{font-size:14px}.eyebrow{font-size:12px}.online{font-size:12px}
+.btn{font-size:14px;padding:11px 15px}.big{padding:14px}.alert{font-size:14px}
+.metric span,.metric small{font-size:12px}.metric strong{font-size:28px}
+.panelTitle h3,.toolbar h3{font-size:17px}.panelTitle p,.toolbar p{font-size:13px}
+.flow b{font-size:12px}.flow span{font-size:14px}.flow small{font-size:11px}
+.modeBar b{font-size:14px}.modeBar small{font-size:12px}.modeBtns button{font-size:12px;padding:9px 12px}
+.dialHeader{font-size:13px}.dialHeader b{font-size:18px}.person h2{font-size:30px}.person p{font-size:13px}.dialNumber{font-size:25px}.resultGrid button{font-size:13px;padding:12px 8px}.info,.notice{font-size:12px}
+.search{font-size:14px;padding:11px 12px}.tableWrap th,.tableWrap td{font-size:13px;padding:12px}.tableWrap th{font-size:11px}.tableWrap td small{font-size:11px}.pill{font-size:11px}.tableBtn{font-size:11px;padding:7px 10px}.pagination{font-size:12px}
+.leadCard b{font-size:13px}.leadCard small{font-size:11px}.miniAvatar{font-size:10px}
+.campaignCard b{font-size:13px}.campaignCard small{font-size:11px}
+.feature h3{font-size:18px}.feature p{font-size:13px}.barRow{font-size:12px}.barRow b{font-size:12px}
+.drawer h2{font-size:27px}.drawer p{font-size:13px}.drawerPhone{font-size:20px}.drawerSection>b{font-size:12px}.drawerSection button{font-size:13px}
+.field label{font-size:12px}.field input{font-size:14px}.check{font-size:11px}
+.authHero p,.authHero small{font-size:14px}
+@media(max-width:900px){.content{padding:20px 18px}.header h1{font-size:28px}}
