@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -8,13 +9,44 @@ export default function OperationsSurface() {
   const pathname = usePathname();
   const [session, setSession] = useState<any>(null);
   const [stats, setStats] = useState({ leads: 0, queue: 0, returns: 0, calls: 0 });
+  const [mount, setMount] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
-    return () => data.subscription.unsubscribe();
+    let alive = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (alive) setSession(data.session);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (alive) setSession(next);
+    });
+    return () => {
+      alive = false;
+      data.subscription.unsubscribe();
+    };
   }, []);
+
+  useEffect(() => {
+    if (pathname !== "/" || !session) {
+      setMount(null);
+      return;
+    }
+
+    const content = document.querySelector<HTMLElement>("main.content");
+    const header = content?.querySelector<HTMLElement>(":scope > .header");
+    if (!content || !header) return;
+
+    const host = document.createElement("div");
+    host.className = "akOperationsSurfaceHost";
+    host.setAttribute("data-ak-operations-surface", "true");
+    header.insertAdjacentElement("afterend", host);
+    setMount(host);
+
+    return () => {
+      host.remove();
+      setMount(null);
+    };
+  }, [pathname, session]);
 
   useEffect(() => {
     if (!session || pathname !== "/" || !supabase) return;
@@ -37,11 +69,11 @@ export default function OperationsSurface() {
     return () => { active = false; };
   }, [session, pathname]);
 
-  if (!session || pathname !== "/") return null;
+  if (!session || pathname !== "/" || !mount) return null;
 
   const openHub = () => document.querySelector<HTMLButtonElement>(".opsLauncher")?.click();
 
-  return (
+  return createPortal(
     <section className="akOperationsSurface" aria-label="Operação 360">
       <div className="akOpsSurfaceHead">
         <div>
@@ -64,22 +96,24 @@ export default function OperationsSurface() {
         <button onClick={openHub}><b>Filtros de fila</b><span>banco, produto, busca e prioridade</span></button>
       </div>
       <style jsx global>{`
-        .akOperationsSurface{margin:0 0 18px;background:linear-gradient(135deg,#081a2f,#123c70);color:#fff;border-radius:18px;padding:22px;box-shadow:0 16px 36px rgba(8,32,62,.14)}
+        .akOperationsSurfaceHost{display:block;width:100%;margin:0 0 18px}
+        .akOperationsSurface{display:block;width:100%;box-sizing:border-box;background:linear-gradient(135deg,#081a2f,#123c70);color:#fff;border-radius:18px;padding:22px;box-shadow:0 16px 36px rgba(8,32,62,.14)}
         .akOpsSurfaceHead{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:18px}
         .akOpsSurfaceHead span{font-size:13px;font-weight:900;letter-spacing:1.4px;color:#8ec7ff}
         .akOpsSurfaceHead h2{margin:5px 0;font-size:25px;letter-spacing:-.4px}
         .akOpsSurfaceHead p{margin:0;color:#c9dbf2;font-size:15px;line-height:1.5;max-width:760px}
-        .akOpsSurfaceHead button{border:0;border-radius:11px;background:#fff;color:#135fae;padding:13px 17px;font-size:15px;font-weight:900;white-space:nowrap}
-        .akOpsSurfaceGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-        .akOpsSurfaceCard{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.15);border-radius:13px;padding:14px}
+        .akOpsSurfaceHead button{border:0;border-radius:11px;background:#fff;color:#135fae;padding:13px 17px;font-size:15px;font-weight:900;white-space:nowrap;cursor:pointer}
+        .akOpsSurfaceGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+        .akOpsSurfaceCard{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.15);border-radius:13px;padding:14px;min-width:0}
         .akOpsSurfaceCard b{display:block;font-size:14px;color:#eaf4ff}.akOpsSurfaceCard strong{display:block;font-size:27px;margin:6px 0}.akOpsSurfaceCard small{font-size:12px;color:#c2d5eb}
-        .akOpsSurfaceFeatures{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:10px}
-        .akOpsSurfaceFeatures button{text-align:left;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.055);color:#fff;border-radius:11px;padding:13px;min-height:82px}
+        .akOpsSurfaceFeatures{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:10px}
+        .akOpsSurfaceFeatures button{text-align:left;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.055);color:#fff;border-radius:11px;padding:13px;min-height:82px;cursor:pointer}
         .akOpsSurfaceFeatures button:hover{background:rgba(255,255,255,.12)}
         .akOpsSurfaceFeatures b{display:block;font-size:14px;margin-bottom:5px}.akOpsSurfaceFeatures span{display:block;color:#c4d7ed;font-size:12px;line-height:1.45}
-        @media(max-width:900px){.akOpsSurfaceHead{flex-direction:column}.akOpsSurfaceGrid,.akOpsSurfaceFeatures{grid-template-columns:repeat(2,1fr)}}
-        @media(max-width:560px){.akOperationsSurface{padding:17px}.akOpsSurfaceGrid,.akOpsSurfaceFeatures{grid-template-columns:1fr}.akOpsSurfaceHead h2{font-size:21px}.akOpsSurfaceHead p{font-size:14px}.akOpsSurfaceHead button{width:100%}}
+        @media(max-width:1100px){.akOpsSurfaceGrid,.akOpsSurfaceFeatures{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:700px){.akOperationsSurface{padding:17px}.akOpsSurfaceHead{flex-direction:column}.akOpsSurfaceGrid,.akOpsSurfaceFeatures{grid-template-columns:1fr}.akOpsSurfaceHead h2{font-size:21px}.akOpsSurfaceHead p{font-size:14px}.akOpsSurfaceHead button{width:100%}}
       `}</style>
-    </section>
+    </section>,
+    mount
   );
 }
