@@ -1,1 +1,7 @@
-export { supabase, createClient } from "@/lib/supabase/client";
+export {
+  supabase,
+  createClient,
+  ensureClient,
+  ensureSupabaseConfig,
+  isSupabaseConfigured,
+} from "@/lib/supabase/client";
