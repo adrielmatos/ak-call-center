@@ -3,11 +3,10 @@ import "./globals.css";
 import "./accessibility-overrides.css";
 import "./operations-hub.css";
 import BankBadge from "./components/bank-badge";
-import OperationsHub from "./components/operations-hub";
 import OperationsSurface from "./components/operations-surface";
 
 export const metadata: Metadata={title:"A&K Soluções Financeiras",description:"Central A&K Soluções Financeiras"};
 
 export default function RootLayout({children}:{children:React.ReactNode}){
-  return <html lang="pt-BR"><body>{children}<OperationsSurface /><BankBadge /><OperationsHub /></body></html>;
+  return <html lang="pt-BR"><body>{children}<OperationsSurface /><BankBadge /></body></html>;
 }
