@@ -1,9 +1,13 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 let browserClient: SupabaseClient | null = null;
+
+const BUILD_URL = "https://placeholder.invalid";
+const BUILD_KEY = "build-placeholder-key";
 
 function getConfig() {
   const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
@@ -20,41 +24,38 @@ export function isSupabaseConfigured() {
   return Boolean(url && key);
 }
 
-export function createClient(): SupabaseClient | null {
+export function createClient(): SupabaseClient {
   if (browserClient) return browserClient;
-  if (typeof window === "undefined") return null;
 
   const { url, key } = getConfig();
-  if (!url || !key) return null;
+
+  // Client Components are prerendered by Next.js during `next build`.
+  // Never make the build depend on public env vars being present in the
+  // build worker. A server-only placeholder is never used for auth/data.
+  if (typeof window === "undefined") {
+    return createSupabaseClient(BUILD_URL, BUILD_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+
+  if (!url || !key) {
+    throw new Error(
+      "Supabase não configurado. Verifique NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY na Vercel."
+    );
+  }
 
   browserClient = createBrowserClient(url, key);
   return browserClient;
 }
 
 /**
- * Lazy browser client.
- *
- * The old singleton was created while the module was being evaluated. During
- * Next.js SSR/prerender `window` does not exist, so that singleton became
- * permanently null and the login screen incorrectly reported missing Vercel
- * variables even when the public Supabase variables were configured.
- *
- * The proxy keeps the existing `supabase.auth` / `supabase.from` API intact
- * and resolves the browser client only when a method/property is accessed.
+ * Lazy compatibility client. Importing this module cannot initialize Supabase
+ * during Next.js build/prerender; the actual browser client is resolved only
+ * when one of its properties is accessed.
  */
 export const supabase = new Proxy({} as SupabaseClient, {
   get(_target, property, receiver) {
     const client = createClient();
-
-    if (!client) {
-      if (!isSupabaseConfigured()) {
-        throw new Error(
-          "Supabase não configurado. Verifique NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY na Vercel."
-        );
-      }
-      throw new Error("Cliente Supabase indisponível fora do navegador.");
-    }
-
     const value = Reflect.get(client as object, property, receiver);
     return typeof value === "function" ? value.bind(client) : value;
   },
