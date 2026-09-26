@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
 const STORAGE_KEY = "ak-call-center:scripts:v1";
-
 const DEFAULT_SCRIPTS: Record<string, string> = {
   SIAPE: `ABERTURA
 "Oi, tudo bem? Falo com [NOME]? Aqui é [SEU NOME], da A&K Soluções Financeiras. Prometo ser rápido. Eu trabalho com atendimento de crédito para servidor federal do SIAPE. Posso te explicar o motivo da ligação?"
@@ -162,10 +161,11 @@ function readSavedScripts() {
 export default function DialerScript() {
   useEffect(() => {
     let disposed = false;
-    let timer: ReturnType<typeof setInterval> | undefined;
+    let timer: number | undefined;
     let lastKey = "";
 
     const remove = () => document.querySelectorAll("[data-ak-dialer-script]").forEach((node) => node.remove());
+    const escapeHtml = (value: string) => value.replace(/[&<>\"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[char] || char));
 
     const render = (leadName: string, phone: string, productRaw: string) => {
       if (disposed) return;
@@ -184,18 +184,9 @@ export default function DialerScript() {
       card.dataset.akDialerScript = "true";
       card.className = "panel akDialerScript";
       card.style.cssText = "padding:22px;align-self:start;max-height:calc(100vh - 210px);overflow:auto;position:sticky;top:18px";
-      card.innerHTML = `
-        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px">
-          <div><div style="font-size:12px;font-weight:800;letter-spacing:.08em;opacity:.7">SCRIPT DO DISCADOR</div><h3 style="font-size:22px;margin:4px 0">${escapeHtml(product)}</h3><div style="font-size:14px;opacity:.8">Cliente: <b>${escapeHtml(leadName)}</b></div></div>
-          <span style="padding:6px 9px;border-radius:999px;background:rgba(59,130,246,.1);font-size:12px;font-weight:800">${escapeHtml(phone)}</span>
-        </div>
-        <textarea readonly style="width:100%;min-height:390px;resize:vertical;border:1px solid rgba(148,163,184,.25);border-radius:12px;padding:14px;font:inherit;line-height:1.55;background:rgba(15,23,42,.03);color:inherit">${escapeHtml(script.replaceAll("[NOME]", leadName))}</textarea>
-        <div style="margin-top:12px;font-size:12px;line-height:1.5;opacity:.7">Script sincronizado com Operação 360. Para alterar, edite e salve o script do produto em <b>Operação 360 → Script de ligação</b>.</div>
-      `;
+      card.innerHTML = `<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px"><div><div style="font-size:12px;font-weight:800;letter-spacing:.08em;opacity:.7">SCRIPT DO DISCADOR</div><h3 style="font-size:22px;margin:4px 0">${escapeHtml(product)}</h3><div style="font-size:14px;opacity:.8">Cliente: <b>${escapeHtml(leadName)}</b></div></div><span style="padding:6px 9px;border-radius:999px;background:rgba(59,130,246,.1);font-size:12px;font-weight:800">${escapeHtml(phone)}</span></div><textarea readonly style="width:100%;min-height:390px;resize:vertical;border:1px solid rgba(148,163,184,.25);border-radius:12px;padding:14px;font:inherit;line-height:1.55;background:rgba(15,23,42,.03);color:inherit">${escapeHtml(script.replaceAll("[NOME]", leadName))}</textarea><div style="margin-top:12px;font-size:12px;line-height:1.5;opacity:.7">Script sincronizado com Operação 360. Para alterar, edite e salve o script do produto em <b>Operação 360 → Script de ligação</b>.</div>`;
       grid.insertBefore(card, callPanel.nextSibling);
     };
-
-    const escapeHtml = (value: string) => value.replace(/[&<>\"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[char] || char));
 
     const load = async () => {
       const phone = String(document.querySelector(".dialNumber")?.textContent || "").replace(/\D/g, "");
@@ -219,7 +210,7 @@ export default function DialerScript() {
     const onStorage = (event: StorageEvent) => { if (event.key === STORAGE_KEY) { lastKey = ""; void load(); } };
     window.addEventListener("storage", onStorage);
 
-    return () => { disposed = true; if (timer) clearInterval(timer); observer.disconnect(); window.removeEventListener("storage", onStorage); remove(); };
+    return () => { disposed = true; if (timer !== undefined) window.clearInterval(timer); observer.disconnect(); window.removeEventListener("storage", onStorage); remove(); };
   }, []);
 
   return null;
