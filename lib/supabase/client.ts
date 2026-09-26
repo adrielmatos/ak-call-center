@@ -25,11 +25,6 @@ export function isSupabaseConfigured() {
   return Boolean(url && key);
 }
 
-/**
- * Resolves the public Supabase configuration at runtime when Vercel did not
- * inject NEXT_PUBLIC_* variables into the client bundle during the build.
- * Only the public URL and publishable/anon key are ever returned.
- */
 export async function ensureSupabaseConfig() {
   const embedded = getEmbeddedConfig();
   if (embedded.url && embedded.key) return embedded;
@@ -58,12 +53,6 @@ export async function ensureSupabaseConfig() {
   return configPromise;
 }
 
-/**
- * Returns the browser Supabase client. During Next.js prerender this function
- * uses a harmless placeholder and never contacts Supabase. In the browser,
- * callers should use ensureClient() so runtime Vercel configuration is loaded
- * before auth/data operations begin.
- */
 export function createClient(): SupabaseClient {
   if (browserClient) return browserClient;
 
@@ -93,12 +82,38 @@ export async function ensureClient(): Promise<SupabaseClient> {
 }
 
 /**
- * Compatibility proxy used by the existing application. It is safe only after
- * ensureClient() has completed in browser code; existing server/build imports
- * remain compatible and no Supabase network client is created during build.
+ * Auth compatibility layer: the first getSession call is allowed to initialize
+ * the runtime client asynchronously. This prevents a missing NEXT_PUBLIC_*
+ * value in the statically built browser bundle from crashing the login page.
  */
+const authProxy = new Proxy({} as SupabaseClient["auth"], {
+  get(_target, property) {
+    if (property === "getSession") {
+      return () => ensureClient().then((client) => client.auth.getSession());
+    }
+    if (property === "onAuthStateChange") {
+      return (...args: Parameters<SupabaseClient["auth"]["onAuthStateChange"]>) => {
+        if (browserClient) return browserClient.auth.onAuthStateChange(...args);
+        return {
+          data: {
+            subscription: {
+              unsubscribe() {},
+            },
+          },
+        } as ReturnType<SupabaseClient["auth"]["onAuthStateChange"]>;
+      };
+    }
+    if (browserClient) {
+      const value = Reflect.get(browserClient.auth as object, property);
+      return typeof value === "function" ? value.bind(browserClient.auth) : value;
+    }
+    return undefined;
+  },
+});
+
 export const supabase = new Proxy({} as SupabaseClient, {
   get(_target, property, receiver) {
+    if (property === "auth") return authProxy;
     const client = createClient();
     const value = Reflect.get(client as object, property, receiver);
     return typeof value === "function" ? value.bind(client) : value;
