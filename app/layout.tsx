@@ -4,10 +4,11 @@ import "./accessibility-overrides.css";
 import "./operations-hub.css";
 import BankBadge from "./components/bank-badge";
 import OperationsSurface from "./components/operations-surface";
+import DeskcommParitySurface from "./components/deskcomm-parity-surface";
 import DialerScript from "./components/dialer-script";
 
 export const metadata: Metadata={title:"A&K Soluções Financeiras",description:"Central A&K Soluções Financeiras"};
 
 export default function RootLayout({children}:{children:React.ReactNode}){
-  return <html lang="pt-BR"><body>{children}<OperationsSurface /><BankBadge /><DialerScript /></body></html>;
+  return <html lang="pt-BR"><body>{children}<OperationsSurface /><DeskcommParitySurface /><BankBadge /><DialerScript /></body></html>;
 }
