@@ -15,23 +15,13 @@ export default function OperationsSurface() {
   useEffect(() => {
     if (!supabase) return;
     let alive = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (alive) setSession(data.session);
-    });
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
-      if (alive) setSession(next);
-    });
-    return () => {
-      alive = false;
-      data.subscription.unsubscribe();
-    };
+    supabase.auth.getSession().then(({ data }) => { if (alive) setSession(data.session); });
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => { if (alive) setSession(next); });
+    return () => { alive = false; data.subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {
-    if (pathname !== "/" || !session) {
-      setMount(null);
-      return;
-    }
+    if (pathname !== "/" || !session) { setMount(null); return; }
     const content = document.querySelector<HTMLElement>("main.content");
     const header = content?.querySelector<HTMLElement>(":scope > .header");
     if (!content || !header) return;
@@ -40,10 +30,7 @@ export default function OperationsSurface() {
     host.setAttribute("data-ak-operations-surface", "true");
     header.insertAdjacentElement("afterend", host);
     setMount(host);
-    return () => {
-      host.remove();
-      setMount(null);
-    };
+    return () => { host.remove(); setMount(null); };
   }, [pathname, session]);
 
   useEffect(() => {
@@ -85,7 +72,6 @@ export default function OperationsSurface() {
         </div>
         <div className="akOperations360Status">● ONLINE</div>
       </header>
-
       <div className="akOperations360Metrics">
         <div><span>◉ Leads na base</span><strong>{stats.leads}</strong><small>mailing carregado</small></div>
         <div><span>☎ Na fila</span><strong>{stats.queue}</strong><small>prontos para contato</small></div>
@@ -95,13 +81,11 @@ export default function OperationsSurface() {
         <div><span>▣ Campanhas</span><strong>{stats.campaigns}</strong><small>cadastradas</small></div>
         <div><span>▥ Ligações</span><strong>{stats.calls}</strong><small>histórico registrado</small></div>
       </div>
-
-      <div className="akOperations360Workspace">
-        <DeskcommParity />
-      </div>
-
+      <div className="akOperations360Workspace"><DeskcommParity /></div>
       <style jsx global>{`
         .akOperationsSurfaceHost{display:block;width:100%;margin:0 0 20px}
+        /* The legacy dashboard cards are now represented by the single Operation 360 panel. */
+        main.content>.statsGrid,main.content>.dashboardGrid{display:none!important}
         .akOperations360{width:100%;box-sizing:border-box;border:1px solid #d7e3ef;border-radius:20px;background:#f7faff;overflow:hidden;box-shadow:0 18px 44px rgba(15,35,60,.10)}
         .akOperations360Head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:24px 26px;background:linear-gradient(135deg,#061a30,#1260aa);color:#fff}
         .akOperations360Head span{font-size:12px;font-weight:900;letter-spacing:1.5px;color:#a9d6ff}
