@@ -58,7 +58,7 @@ export default function Home(){
       jobs.push(supabase.from("campanhas").select("id,nome,produto,status,created_at,inicio_at,fim_at").neq("status","removida").order("created_at",{ascending:false}).limit(100).then(x=>["campaigns",x]));
     if(["dashboard","retornos","crm"].includes(targetMode))
       jobs.push(supabase.from("retornos").select("id,lead_id,operador_id,data_hora,observacao,concluido,leads(id,nome,cpf,cidade,uf,produto,telefones(id,numero_normalizado))").eq("concluido",false).order("data_hora",{ascending:true}).limit(500).then(x=>["returns",x]));
-    if(["resultados","relatorios"].includes(targetMode))
+    if(["dashboard","resultados","relatorios"].includes(targetMode))
       jobs.push(supabase.from("ligacoes").select("id,lead_id,operador_id,telefone_id,inicio,fim,resultado,observacao,created_at,leads(id,nome,cpf)").order("created_at",{ascending:false}).limit(1000).then(x=>["calls",x]));
     const results=await Promise.all(jobs);
     let loadedLeads:Lead[]=[];
