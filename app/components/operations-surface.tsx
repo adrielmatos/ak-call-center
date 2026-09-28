@@ -25,12 +25,31 @@ export default function OperationsSurface() {
     const content = document.querySelector<HTMLElement>("main.content");
     const header = content?.querySelector<HTMLElement>(":scope > .header");
     if (!content || !header) return;
+
     const host = document.createElement("div");
     host.className = "akOperationsSurfaceHost";
     host.setAttribute("data-ak-operations-surface", "true");
     header.insertAdjacentElement("afterend", host);
+
+    const hideLegacyDashboard = () => {
+      content.querySelectorAll<HTMLElement>(".stack, .metricGrid, .dashboardGrid, .heroPanel").forEach((el) => {
+        if (!el.closest("[data-ak-operations-surface]")) el.style.setProperty("display", "none", "important");
+      });
+    };
+
+    hideLegacyDashboard();
+    const observer = new MutationObserver(hideLegacyDashboard);
+    observer.observe(content, { childList: true, subtree: true });
     setMount(host);
-    return () => { host.remove(); setMount(null); };
+
+    return () => {
+      observer.disconnect();
+      content.querySelectorAll<HTMLElement>(".stack, .metricGrid, .dashboardGrid, .heroPanel").forEach((el) => {
+        el.style.removeProperty("display");
+      });
+      host.remove();
+      setMount(null);
+    };
   }, [pathname, session]);
 
   useEffect(() => {
@@ -46,7 +65,7 @@ export default function OperationsSurface() {
       ]);
       if (!active) return;
       const leads = l.data || [];
-      const opportunities = (c.data || []).filter((x: any) => ["Interessado", "Simulação", "Proposta", "Contrato"].includes(x.resultado)).length;
+      const opportunities = (c.data || []).filter((x: any) => ["Interessado", "Simulação", "Proposta", "Contrato", "interessado", "simulação", "proposta", "contrato"].includes(String(x.resultado || ""))).length;
       setStats({
         leads: l.count ?? leads.length,
         queue: leads.filter((x: any) => x.status === "disponivel" && !x.bloqueado && !x.opt_out && x.telefones?.length).length,
@@ -68,10 +87,11 @@ export default function OperationsSurface() {
         <div>
           <span>OPERAÇÃO 360 • CENTRAL OPERACIONAL</span>
           <h2>Fila, CRM, Customer 360 e operação em um único painel</h2>
-          <p>Todos os indicadores e ferramentas do dashboard ficam aqui, usando a mesma base, discadora e histórico do A&K.</p>
+          <p>Todos os indicadores e ferramentas da Visão geral ficam concentrados aqui, usando a mesma base, discadora e histórico do A&amp;K.</p>
         </div>
         <div className="akOperations360Status">● ONLINE</div>
       </header>
+
       <div className="akOperations360Metrics">
         <div><span>◉ Leads na base</span><strong>{stats.leads}</strong><small>mailing carregado</small></div>
         <div><span>☎ Na fila</span><strong>{stats.queue}</strong><small>prontos para contato</small></div>
@@ -81,17 +101,13 @@ export default function OperationsSurface() {
         <div><span>▣ Campanhas</span><strong>{stats.campaigns}</strong><small>cadastradas</small></div>
         <div><span>▥ Ligações</span><strong>{stats.calls}</strong><small>histórico registrado</small></div>
       </div>
-      <div className="akOperations360Workspace"><DeskcommParity /></div>
+
+      <div className="akOperations360Workspace">
+        <DeskcommParity />
+      </div>
+
       <style jsx global>{`
         .akOperationsSurfaceHost{display:block;width:100%;margin:0 0 20px}
-        /* A Visão geral tem uma única superfície. O conteúdo legado do dashboard fica
-           disponível nos módulos, mas não é exibido por baixo da Operação 360. */
-        main.content:has(.akOperations360) > .stack{display:none!important}
-        main.content:has(.akOperations360) .metricGrid,
-        main.content:has(.akOperations360) .dashboardGrid,
-        main.content:has(.akOperations360) .crmSuiteHead,
-        main.content:has(.akOperations360) .crmSuiteHead~*,
-        main.content:has(.akOperations360) .panel:has(>.crmSuiteHead){display:none!important}
         .akOperations360{width:100%;box-sizing:border-box;border:1px solid #d7e3ef;border-radius:20px;background:#f7faff;overflow:hidden;box-shadow:0 18px 44px rgba(15,35,60,.10)}
         .akOperations360Head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:24px 26px;background:linear-gradient(135deg,#061a30,#1260aa);color:#fff}
         .akOperations360Head span{font-size:12px;font-weight:900;letter-spacing:1.5px;color:#a9d6ff}
@@ -105,7 +121,7 @@ export default function OperationsSurface() {
         .akOperations360Metrics small{display:block;font-size:11px;color:#718096;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .akOperations360Workspace{padding:0 14px 14px}
         .akOperations360Workspace .dkParity{margin-top:0;border:0;border-radius:0;background:transparent;box-shadow:none;overflow:visible}
-        .akOperations360Workspace .dkParity>header{display:none}
+        .akOperations360Workspace .dkParity>header{display:none !important}
         .akOperations360Workspace .dkParity nav{margin:0 -14px;padding:11px 14px;background:#fff;border-bottom:1px solid #dfe8f1;box-shadow:0 1px 0 rgba(15,23,42,.02)}
         .akOperations360Workspace .dkParity nav button{font-size:14px;padding:10px 14px}
         .akOperations360Workspace .dkBody{padding:16px 0}
@@ -114,6 +130,8 @@ export default function OperationsSurface() {
         .akOperations360Workspace .dkMetric b{font-size:24px}
         .akOperations360Workspace .dkPanel{padding:15px}
         .akOperations360Workspace .dkPanel h3{font-size:16px}
+        .akOperations360Workspace .dkParity .dkMetrics{display:none !important}
+        .akOperations360Workspace .dkParity nav button:first-child{display:none !important}
         @media(max-width:1200px){.akOperations360Metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
         @media(max-width:760px){.akOperations360Head{padding:19px;flex-direction:column}.akOperations360Head h2{font-size:21px}.akOperations360Head p{font-size:14px}.akOperations360Metrics{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px}.akOperations360Workspace{padding:0 10px 10px}}
       `}</style>
