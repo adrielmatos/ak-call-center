@@ -1,6 +1,5 @@
 "use client";
 
-import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -42,7 +41,17 @@ export default function OperationsSurface() {
     header.insertAdjacentElement("afterend", host);
 
     const hideLegacyDashboard = () => {
-      content.querySelectorAll<HTMLElement>(".stack, .metricGrid, .dashboardGrid, .heroPanel").forEach((el) => {
+      content.querySelectorAll<HTMLElement>(
+        ".stack, .metricGrid, .dashboardGrid, .heroPanel, .crmSuiteHead, .crmSuite"
+      ).forEach((el) => {
+        if (!el.closest("[data-ak-operations-surface]")) {
+          el.style.setProperty("display", "none", "important");
+        }
+      });
+
+      // The old Deskcomm block is rendered inside a generic panel. Hide the
+      // complete containing stack/panel instead of leaving an empty header.
+      content.querySelectorAll<HTMLElement>(".panel:has(.crmSuiteHead), .stack:has(.crmSuiteHead)").forEach((el) => {
         if (!el.closest("[data-ak-operations-surface]")) {
           el.style.setProperty("display", "none", "important");
         }
@@ -56,7 +65,9 @@ export default function OperationsSurface() {
 
     return () => {
       observer.disconnect();
-      content.querySelectorAll<HTMLElement>(".stack, .metricGrid, .dashboardGrid, .heroPanel").forEach((el) => {
+      content.querySelectorAll<HTMLElement>(
+        ".stack, .metricGrid, .dashboardGrid, .heroPanel, .crmSuiteHead, .crmSuite, .panel:has(.crmSuiteHead), .stack:has(.crmSuiteHead)"
+      ).forEach((el) => {
         el.style.removeProperty("display");
       });
       host.remove();
@@ -101,7 +112,7 @@ export default function OperationsSurface() {
 
   if (!session || pathname !== "/" || !mount) return null;
 
-  return createPortal(
+  return (
     <section className="akOperations360" aria-label="Operação 360">
       <header className="akOperations360Head">
         <div>
@@ -135,10 +146,14 @@ export default function OperationsSurface() {
         .akOperations360Metrics span{display:block;font-size:12px;font-weight:800;color:#53657a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .akOperations360Metrics strong{display:block;font-size:25px;line-height:1.1;margin:5px 0 3px;color:#0d3158}
         .akOperations360Metrics small{display:block;font-size:11px;color:#718096;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        /* Dashboard is the only place where Operação 360 exists. Never show the old Deskcomm panel anywhere. */
+        main.content .crmSuite,
+        main.content .crmSuiteHead,
+        main.content .panel:has(.crmSuiteHead),
+        main.content .stack:has(.crmSuiteHead){display:none!important}
         @media(max-width:1200px){.akOperations360Metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
         @media(max-width:760px){.akOperations360Head{padding:19px;flex-direction:column}.akOperations360Head h2{font-size:21px}.akOperations360Head p{font-size:14px}.akOperations360Metrics{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px}}
       `}</style>
-    </section>,
-    mount,
+    </section>
   );
 }
