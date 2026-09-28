@@ -84,8 +84,15 @@ export default function OperationsSurface() {
       <div className="akOperations360Workspace"><DeskcommParity /></div>
       <style jsx global>{`
         .akOperationsSurfaceHost{display:block;width:100%;margin:0 0 20px}
-        /* The legacy dashboard cards are now represented by the single Operation 360 panel. */
-        main.content>.statsGrid,main.content>.dashboardGrid{display:none!important}
+
+        /* O Dashboard agora tem uma única superfície operacional. O conteúdo legado continua
+           no código para não quebrar seus módulos, mas não é renderizado em duplicidade na tela inicial. */
+        main.content:has(.akOperations360) .metricGrid,
+        main.content:has(.akOperations360) .dashboardGrid,
+        main.content:has(.akOperations360) .crmSuiteHead,
+        main.content:has(.akOperations360) .crmSuiteHead~*,
+        main.content:has(.akOperations360) .panel:has(>.crmSuiteHead){display:none!important}
+
         .akOperations360{width:100%;box-sizing:border-box;border:1px solid #d7e3ef;border-radius:20px;background:#f7faff;overflow:hidden;box-shadow:0 18px 44px rgba(15,35,60,.10)}
         .akOperations360Head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:24px 26px;background:linear-gradient(135deg,#061a30,#1260aa);color:#fff}
         .akOperations360Head span{font-size:12px;font-weight:900;letter-spacing:1.5px;color:#a9d6ff}
