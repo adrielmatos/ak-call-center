@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -100,7 +101,7 @@ export default function OperationsSurface() {
 
   if (!session || pathname !== "/" || !mount) return null;
 
-  return createOperationsPortal(
+  return createPortal(
     <section className="akOperations360" aria-label="Operação 360">
       <header className="akOperations360Head">
         <div>
@@ -140,9 +141,4 @@ export default function OperationsSurface() {
     </section>,
     mount,
   );
-}
-
-function createOperationsPortal(content: React.ReactNode, mount: HTMLElement) {
-  if (typeof document === "undefined") return null;
-  return require("react-dom").createPortal(content, mount);
 }
