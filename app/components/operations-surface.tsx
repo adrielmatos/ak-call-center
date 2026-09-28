@@ -1,10 +1,8 @@
 "use client";
 
-import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import DeskcommParity from "./deskcomm-parity";
 
 export default function OperationsSurface() {
   const pathname = usePathname();
@@ -15,13 +13,24 @@ export default function OperationsSurface() {
   useEffect(() => {
     if (!supabase) return;
     let alive = true;
-    supabase.auth.getSession().then(({ data }) => { if (alive) setSession(data.session); });
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => { if (alive) setSession(next); });
-    return () => { alive = false; data.subscription.unsubscribe(); };
+    supabase.auth.getSession().then(({ data }) => {
+      if (alive) setSession(data.session);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (alive) setSession(next);
+    });
+    return () => {
+      alive = false;
+      data.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
-    if (pathname !== "/" || !session) { setMount(null); return; }
+    if (pathname !== "/" || !session) {
+      setMount(null);
+      return;
+    }
+
     const content = document.querySelector<HTMLElement>("main.content");
     const header = content?.querySelector<HTMLElement>(":scope > .header");
     if (!content || !header) return;
@@ -33,7 +42,9 @@ export default function OperationsSurface() {
 
     const hideLegacyDashboard = () => {
       content.querySelectorAll<HTMLElement>(".stack, .metricGrid, .dashboardGrid, .heroPanel").forEach((el) => {
-        if (!el.closest("[data-ak-operations-surface]")) el.style.setProperty("display", "none", "important");
+        if (!el.closest("[data-ak-operations-surface]")) {
+          el.style.setProperty("display", "none", "important");
+        }
       });
     };
 
@@ -55,6 +66,7 @@ export default function OperationsSurface() {
   useEffect(() => {
     if (!session || pathname !== "/" || !supabase) return;
     let active = true;
+
     (async () => {
       const [l, r, c, n, campaigns] = await Promise.all([
         supabase.from("leads").select("id,status,bloqueado,opt_out,telefones(id)", { count: "exact" }).limit(1000),
@@ -63,9 +75,13 @@ export default function OperationsSurface() {
         supabase.from("lista_nao_perturbe").select("id", { count: "exact", head: true }).eq("ativo", true),
         supabase.from("campanhas").select("id", { count: "exact", head: true }).neq("status", "removida"),
       ]);
+
       if (!active) return;
       const leads = l.data || [];
-      const opportunities = (c.data || []).filter((x: any) => ["Interessado", "Simulação", "Proposta", "Contrato", "interessado", "simulação", "proposta", "contrato"].includes(String(x.resultado || ""))).length;
+      const opportunities = (c.data || []).filter((x: any) =>
+        ["Interessado", "Simulação", "Proposta", "Contrato", "interessado", "simulação", "proposta", "contrato"].includes(String(x.resultado || "")),
+      ).length;
+
       setStats({
         leads: l.count ?? leads.length,
         queue: leads.filter((x: any) => x.status === "disponivel" && !x.bloqueado && !x.opt_out && x.telefones?.length).length,
@@ -76,12 +92,15 @@ export default function OperationsSurface() {
         campaigns: campaigns.count ?? 0,
       });
     })();
-    return () => { active = false; };
+
+    return () => {
+      active = false;
+    };
   }, [session, pathname]);
 
   if (!session || pathname !== "/" || !mount) return null;
 
-  return createPortal(
+  return createOperationsPortal(
     <section className="akOperations360" aria-label="Operação 360">
       <header className="akOperations360Head">
         <div>
@@ -102,10 +121,6 @@ export default function OperationsSurface() {
         <div><span>▥ Ligações</span><strong>{stats.calls}</strong><small>histórico registrado</small></div>
       </div>
 
-      <div className="akOperations360Workspace">
-        <DeskcommParity />
-      </div>
-
       <style jsx global>{`
         .akOperationsSurfaceHost{display:block;width:100%;margin:0 0 20px}
         .akOperations360{width:100%;box-sizing:border-box;border:1px solid #d7e3ef;border-radius:20px;background:#f7faff;overflow:hidden;box-shadow:0 18px 44px rgba(15,35,60,.10)}
@@ -119,23 +134,15 @@ export default function OperationsSurface() {
         .akOperations360Metrics span{display:block;font-size:12px;font-weight:800;color:#53657a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .akOperations360Metrics strong{display:block;font-size:25px;line-height:1.1;margin:5px 0 3px;color:#0d3158}
         .akOperations360Metrics small{display:block;font-size:11px;color:#718096;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .akOperations360Workspace{padding:0 14px 14px}
-        .akOperations360Workspace .dkParity{margin-top:0;border:0;border-radius:0;background:transparent;box-shadow:none;overflow:visible}
-        .akOperations360Workspace .dkParity>header{display:none !important}
-        .akOperations360Workspace .dkParity nav{margin:0 -14px;padding:11px 14px;background:#fff;border-bottom:1px solid #dfe8f1;box-shadow:0 1px 0 rgba(15,23,42,.02)}
-        .akOperations360Workspace .dkParity nav button{font-size:14px;padding:10px 14px}
-        .akOperations360Workspace .dkBody{padding:16px 0}
-        .akOperations360Workspace .dkMetric{padding:13px}
-        .akOperations360Workspace .dkMetric span{font-size:12px}
-        .akOperations360Workspace .dkMetric b{font-size:24px}
-        .akOperations360Workspace .dkPanel{padding:15px}
-        .akOperations360Workspace .dkPanel h3{font-size:16px}
-        .akOperations360Workspace .dkParity .dkMetrics{display:none !important}
-        .akOperations360Workspace .dkParity nav button:first-child{display:none !important}
         @media(max-width:1200px){.akOperations360Metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
-        @media(max-width:760px){.akOperations360Head{padding:19px;flex-direction:column}.akOperations360Head h2{font-size:21px}.akOperations360Head p{font-size:14px}.akOperations360Metrics{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px}.akOperations360Workspace{padding:0 10px 10px}}
+        @media(max-width:760px){.akOperations360Head{padding:19px;flex-direction:column}.akOperations360Head h2{font-size:21px}.akOperations360Head p{font-size:14px}.akOperations360Metrics{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px}}
       `}</style>
     </section>,
     mount,
   );
+}
+
+function createOperationsPortal(content: React.ReactNode, mount: HTMLElement) {
+  if (typeof document === "undefined") return null;
+  return require("react-dom").createPortal(content, mount);
 }
