@@ -4,57 +4,101 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-function getPublicConfig() {
-  return {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    // Compatibilidade com projetos que ainda possuem a variável anon antiga.
-    key:
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+type SupabasePublicConfig = {
+  url: string;
+  key: string;
+};
+
+function getPublicConfig(): SupabasePublicConfig {
+  const url = String(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  ).trim();
+
+  const key = String(
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       "",
-  };
+  ).trim();
+
+  return { url, key };
 }
 
-function createSafeServerClient(url: string, key: string, store: Awaited<ReturnType<typeof cookies>>) {
-  return createServerClient(url, key, {
-    cookies: {
-      getAll: () => store.getAll(),
-      setAll(values) {
-        try {
-          values.forEach(({ name, value, options }) => store.set(name, value, options));
-        } catch {
-          // Server Components podem não permitir escrita de cookies.
-        }
-      },
-    },
-  });
+function assertPublicConfig(
+  config: SupabasePublicConfig,
+): void {
+  if (!config.url || !config.key) {
+    throw new Error(
+      "Supabase não está configurado no servidor. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+    );
+  }
 }
 
 export async function createClient() {
-  const store = await cookies();
-  const { url, key } = getPublicConfig();
+  const cookieStore = await cookies();
+  const config = getPublicConfig();
 
-  if (!url || !key) {
-    // O Next pode avaliar módulos server durante o build/prerender.
-    // Nunca tente acessar Supabase nesse momento e nunca exponha segredo.
-    if (process.env.NEXT_PHASE === "phase-production-build") {
-      return createSafeServerClient("https://placeholder.invalid", "build-placeholder", store);
-    }
-    throw new Error("Supabase não configurado.");
-  }
+  assertPublicConfig(config);
 
-  return createSafeServerClient(url, key, store);
+  return createServerClient(
+    config.url,
+    config.key,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(
+              ({ name, value, options }) => {
+                cookieStore.set(
+                  name,
+                  value,
+                  options,
+                );
+              },
+            );
+          } catch {
+            // Server Components podem não permitir escrita de cookies.
+            // O middleware é responsável pela renovação da sessão.
+          }
+        },
+      },
+    },
+  );
 }
 
 // Compatibilidade com rotas existentes.
 export const createServerSupabaseClient = createClient;
 
+/**
+ * Cliente administrativo. Nunca usar em Client Components.
+ * SUPABASE_SERVICE_ROLE_KEY jamais deve possuir o prefixo NEXT_PUBLIC_.
+ */
 export function createServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase service client não configurado.");
+  const url = String(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  ).trim();
 
-  return createSupabaseClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const serviceRoleKey = String(
+    process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+  ).trim();
+
+  if (!url || !serviceRoleKey) {
+    throw new Error(
+      "Supabase Service Role não está configurado.",
+    );
+  }
+
+  return createSupabaseClient(
+    url,
+    serviceRoleKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    },
+  );
 }
