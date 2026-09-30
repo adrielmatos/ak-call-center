@@ -133,3 +133,33 @@
 .akOperations360Actions b{color:#0d3158;font-size:16px}
 @media(max-width:1200px){.akOperations360Metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:760px){.akOperations360Head{padding:19px;flex-direction:column}.akOperations360Head h2{font-size:21px}.akOperations360Head p{font-size:14px}.akOperations360Metrics{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px}.akOperations360Body{align-items:flex-start;flex-direction:column}.akOperations360Actions{justify-content:flex-start}}
+
+/* Discador compacto: lead, ações e tabulação ficam no mesmo eixo visual. */
+.dialQueueBar{padding:11px 14px}
+.dialAutoStatus{margin-left:auto}
+.dialGrid{grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr);align-items:start}
+.dialerLeft{display:grid;gap:10px;min-width:0}
+.callPanel{min-height:0;padding:16px}
+.person{margin-top:4px}
+.personAvatar{width:48px;height:48px}
+.person h2{font-size:22px}
+.dialNumber{font-size:18px;margin:12px 0}
+.leadMeta{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+.leadProduct,.leadPhone{display:inline-flex;align-items:center;border:1px solid #ffffff2b;background:#ffffff10;color:#d9e8f9;border-radius:999px;padding:6px 9px;font-size:9px}
+.callState{display:flex;align-items:center;gap:7px;font-size:9px;font-weight:800;color:#d8e8f9;margin:8px 0 11px}
+.callStateDot{width:7px;height:7px;border-radius:50%;background:#4de2aa;box-shadow:0 0 0 4px #4de2aa22}
+.dialerActions{gap:6px}
+.dialerActions .btn{padding:8px 10px;font-size:10px}
+.callHint{margin-top:10px;padding-top:9px;border-top:1px solid #ffffff24;color:#bcd1e9;font-size:9px;line-height:1.45}
+.tabulationPanel{padding:13px}
+.tabulationPanel .panelTitle{margin-bottom:9px}
+.tabulationPanel .panelTitle h3{font-size:13px}
+.tabulationPanel .resultGrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.tabulationPanel .resultGrid button{padding:9px 6px;font-size:9px}
+.scriptPanel{padding:15px}
+.scriptPanel .scriptBlock{max-height:360px;overflow:auto}
+.scriptPanel .scriptCard>p{font-size:10px;margin:5px 0}
+.scriptPanel .info{margin-top:10px}
+@media(max-width:1200px){.dialGrid{grid-template-columns:1fr}.scriptPanel{order:2}.dialerLeft{order:1}.tabulationPanel .resultGrid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:600px){.dialGrid{grid-template-columns:1fr}.person h2{font-size:19px}.leadMeta{gap:5px}.dialerActions .btn{flex:1 1 auto}.tabulationPanel .resultGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.scriptPanel .scriptBlock{max-height:none}}
+
