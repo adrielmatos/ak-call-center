@@ -15,7 +15,8 @@
     "react-dom": "^19.1.0",
     "xlsx": "npm:@stackline/xlsx@1.0.7",
     "@supabase/ssr": "^0.7.0",
-    "zod": "^4.1.0"
+    "zod": "^4.1.0",
+    "sip.js": "^0.21.2"
   },
   "overrides": {
     "postcss": "^8.5.24"
