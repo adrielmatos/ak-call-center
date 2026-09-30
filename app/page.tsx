@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { parseFile, phone, cpf } from "@/lib/importer";
+import * as XLSX from "xlsx";
 
 type Lead = {
   id: string;
@@ -720,6 +721,41 @@ export default function Home() {
     }
   }
 
+  async function addNpdEntries(entries: Array<{ cpf?: string; telefone?: string; nome?: string; motivo?: string }>) {
+    if (!supabase || !operator || !entries.length) return;
+    const rows = entries
+      .map((x) => ({
+        cpf: cpf(x.cpf || "") || null,
+        telefone: phone(x.telefone || "") || null,
+        nome: String(x.nome || "").trim() || null,
+        origem: "importacao_manual",
+        motivo: String(x.motivo || "Solicitação de não contato").trim(),
+        operador_id: operator.id,
+      }))
+      .filter((x) => x.cpf || x.telefone);
+    if (!rows.length) {
+      setError("Nenhum telefone ou CPF válido foi encontrado na lista.");
+      return;
+    }
+    const { error: e } = await supabase.from("lista_nao_perturbe").insert(rows);
+    if (e) {
+      setError(e.message);
+      return;
+    }
+    for (const row of rows) {
+      if (row.cpf) {
+        await supabase.from("leads").update({ bloqueado: true, opt_out: true, status: "bloqueado", updated_at: new Date().toISOString() }).eq("cpf", row.cpf);
+      } else if (row.telefone) {
+        const { data: ts } = await supabase.from("telefones").select("lead_id").eq("numero_normalizado", row.telefone).limit(20);
+        const ids = (ts || []).map((x: any) => x.lead_id);
+        if (ids.length) await supabase.from("leads").update({ bloqueado: true, opt_out: true, status: "bloqueado", updated_at: new Date().toISOString() }).in("id", ids);
+      }
+    }
+    await audit("npd_importado", "lista_nao_perturbe", undefined, { quantidade: rows.length });
+    setMsg(rows.length + " bloqueio(s) cadastrado(s).");
+    await load("npd");
+  }
+
   async function saveChannelsFor(targetId: string, data: any) {
     if (!supabase || !operator) return;
     if (targetId !== operator.id && operator.perfil !== "admin") return;
@@ -933,8 +969,8 @@ export default function Home() {
         )}
         {mode === "telefonia" && <Telephony config={dialerConfig} onSave={saveDialer} />}
         {mode === "mensagens" && <Omnichannel config={channelConfig} onSave={saveChannels} />}
-        {mode === "relatorios" && <Reports leads={leads} npd={npd} calls={calls} returns={returns} />}
-        {mode === "npd" && <Npd rows={npd} onRemove={removeNpd} />}
+        {mode === "relatorios" && <Reports leads={leads} npd={npd} calls={calls} returns={returns} users={users} />}
+        {mode === "npd" && <Npd rows={npd} onRemove={removeNpd} onAdd={addNpdEntries} />}
         {mode === "config" && (
           <Settings
             operator={operator}
@@ -1750,150 +1786,90 @@ function Returns({
 }
 
 function Telephony({ config, onSave }: { config: any; onSave: (d: any) => void }) {
-  return (
-    <div className="panel">
-      <PanelTitle title="Configuração de Telefonia" subtitle="Ajustes de integrações com troncos SIP e discador." />
-      <p>Configurações gerais salvas para a conta do operador corrente.</p>
+  const [form,setForm]=useState<any>(()=>({nome:config?.nome||"Phone Link / WebRTC",modo:config?.modo||"preview",chamadas_simultaneas:config?.chamadas_simultaneas||1,retentativas:config?.retentativas||2,intervalo_segundos:config?.intervalo_segundos||30,ativo:config?.ativo??true,regras:config?.regras||{tronco:"",ramal:"",servidor:"",usuario:"",senha:"",codec:"OPUS",transporte:"WSS"}}));
+  useEffect(()=>setForm({nome:config?.nome||"Phone Link / WebRTC",modo:config?.modo||"preview",chamadas_simultaneas:config?.chamadas_simultaneas||1,retentativas:config?.retentativas||2,intervalo_segundos:config?.intervalo_segundos||30,ativo:config?.ativo??true,regras:config?.regras||{tronco:"",ramal:"",servidor:"",usuario:"",senha:"",codec:"OPUS",transporte:"WSS"}}),[config]);
+  const setR=(k:string,v:any)=>setForm((x:any)=>({...x,regras:{...(x.regras||{}),[k]:v}}));
+  return <div className="stack">
+    <div className="panel"><PanelTitle title="Telefonia & Discador" subtitle="Configure tronco SIP, ramal e parâmetros do discador sem expor credenciais no frontend."/>
+      <div className="formGrid">
+        <Field label="Nome da configuração"><input value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})}/></Field>
+        <Field label="Modo"><select value={form.modo} onChange={e=>setForm({...form,modo:e.target.value})}><option value="preview">Preview</option><option value="power">Power</option><option value="preditivo">Preditivo</option><option value="blended">Blended</option></select></Field>
+        <Field label="Tronco SIP / Gateway"><input value={form.regras?.tronco||""} onChange={e=>setR("tronco",e.target.value)} placeholder="sip:empresa.exemplo"/></Field>
+        <Field label="Servidor SIP / WebSocket"><input value={form.regras?.servidor||""} onChange={e=>setR("servidor",e.target.value)} placeholder="wss://..."/></Field>
+        <Field label="Ramal"><input value={form.regras?.ramal||""} onChange={e=>setR("ramal",e.target.value)} placeholder="1001"/></Field>
+        <Field label="Usuário SIP"><input value={form.regras?.usuario||""} onChange={e=>setR("usuario",e.target.value)}/></Field>
+        <Field label="Senha SIP" secret><input type="password" value={form.regras?.senha||""} onChange={e=>setR("senha",e.target.value)}/></Field>
+        <Field label="Codec"><select value={form.regras?.codec||"OPUS"} onChange={e=>setR("codec",e.target.value)}><option>OPUS</option><option>PCMU</option><option>PCMA</option></select></Field>
+        <Field label="Transporte"><select value={form.regras?.transporte||"WSS"} onChange={e=>setR("transporte",e.target.value)}><option>WSS</option><option>UDP</option><option>TCP</option></select></Field>
+        <Field label="Chamadas simultâneas"><input type="number" min="1" value={form.chamadas_simultaneas} onChange={e=>setForm({...form,chamadas_simultaneas:Number(e.target.value)})}/></Field>
+        <Field label="Retentativas"><input type="number" min="0" value={form.retentativas} onChange={e=>setForm({...form,retentativas:Number(e.target.value)})}/></Field>
+        <Field label="Intervalo (segundos)"><input type="number" min="1" value={form.intervalo_segundos} onChange={e=>setForm({...form,intervalo_segundos:Number(e.target.value)})}/></Field>
+      </div>
+      <div className="inlineActions"><label className="switchRow"><input type="checkbox" checked={!!form.ativo} onChange={e=>setForm({...form,ativo:e.target.checked})}/><span>Discador ativo</span></label><button className="btn primary" onClick={()=>onSave(form)}>Salvar configuração</button></div>
     </div>
-  );
+    <div className="panel"><PanelTitle title="Status da telefonia" subtitle="A conexão real depende do provedor SIP/WebRTC configurado."/><div className="statusCards"><div><span className="statusDot"/><b>{form.ativo?"Configurado":"Desativado"}</b><small>{form.regras?.servidor||"Servidor não informado"}</small></div><div><b>Ramal</b><small>{form.regras?.ramal||"—"}</small></div><div><b>Modo</b><small>{form.modo}</small></div></div></div>
+  </div>
 }
 
 function Omnichannel({ config, onSave }: { config: any; onSave: (d: any) => void }) {
-  return (
-    <div className="panel">
-      <PanelTitle title="Omnichannel" subtitle="Integração de WhatsApp, SMS e E-mail." />
-      <p>Configure os canais integrados para automação de mensagens.</p>
-    </div>
-  );
+  const base={whatsapp_numero:"",whatsapp_business_account_id:"",whatsapp_phone_number_id:"",instagram_usuario:"",messenger_page_id:"",email_endereco:"",sms_provedor:"",ia_ativa:false,configuracoes:{whatsapp:{tipo:"webhook",url:"",token:"",ativo:false},api:{url:"",token:"",ativo:false},sms:{url:"",token:"",ativo:false},email:{smtp_host:"",smtp_port:"587",smtp_user:"",smtp_password:"",ativo:false}}};
+  const [form,setForm]=useState<any>(()=>({...base,...config,configuracoes:{...base.configuracoes,...(config?.configuracoes||{})}}));
+  const [test,setTest]=useState("");
+  useEffect(()=>setForm({...base,...config,configuracoes:{...base.configuracoes,...(config?.configuracoes||{})}}),[config]);
+  const setC=(channel:string,key:string,value:any)=>setForm((x:any)=>({...x,configuracoes:{...x.configuracoes,[channel]:{...(x.configuracoes?.[channel]||{}),[key]:value}}}));
+  const runTest=(channel:string)=>{const x=form.configuracoes?.[channel]||{}; if(!x.url&&channel!=="email"){setTest("Informe a URL do canal antes de testar.");return;} setTest("Teste preparado para "+channel+". Salve a configuração e valide o endpoint do provedor.");};
+  return <div className="stack"><div className="channelGrid">
+    <ChannelCard title="WhatsApp Webhook" icon="WA" online={!!form.configuracoes?.whatsapp?.ativo}><Field label="Webhook URL"><input value={form.configuracoes?.whatsapp?.url||""} onChange={e=>setC("whatsapp","url",e.target.value)} placeholder="https://seu-endpoint/webhook"/></Field><Field label="Token"><input type="password" value={form.configuracoes?.whatsapp?.token||""} onChange={e=>setC("whatsapp","token",e.target.value)}/></Field><Field label="Número"><input value={form.whatsapp_numero||""} onChange={e=>setForm({...form,whatsapp_numero:e.target.value})}/></Field><label className="switchRow"><input type="checkbox" checked={!!form.configuracoes?.whatsapp?.ativo} onChange={e=>setC("whatsapp","ativo",e.target.checked)}/><span>Online</span></label><button className="btn" onClick={()=>runTest("whatsapp")}>Testar conexão</button></ChannelCard>
+    <ChannelCard title="Instância API" icon="API" online={!!form.configuracoes?.api?.ativo}><Field label="Base URL"><input value={form.configuracoes?.api?.url||""} onChange={e=>setC("api","url",e.target.value)} placeholder="https://api.provedor.com"/></Field><Field label="Token / API Key"><input type="password" value={form.configuracoes?.api?.token||""} onChange={e=>setC("api","token",e.target.value)}/></Field><Field label="Phone Number ID"><input value={form.whatsapp_phone_number_id||""} onChange={e=>setForm({...form,whatsapp_phone_number_id:e.target.value})}/></Field><label className="switchRow"><input type="checkbox" checked={!!form.configuracoes?.api?.ativo} onChange={e=>setC("api","ativo",e.target.checked)}/><span>Online</span></label><button className="btn" onClick={()=>runTest("api")}>Testar API</button></ChannelCard>
+    <ChannelCard title="SMS" icon="SMS" online={!!form.configuracoes?.sms?.ativo}><Field label="Endpoint"><input value={form.configuracoes?.sms?.url||""} onChange={e=>setC("sms","url",e.target.value)}/></Field><Field label="Token"><input type="password" value={form.configuracoes?.sms?.token||""} onChange={e=>setC("sms","token",e.target.value)}/></Field><Field label="Provedor"><input value={form.sms_provedor||""} onChange={e=>setForm({...form,sms_provedor:e.target.value})}/></Field><label className="switchRow"><input type="checkbox" checked={!!form.configuracoes?.sms?.ativo} onChange={e=>setC("sms","ativo",e.target.checked)}/><span>Online</span></label><button className="btn" onClick={()=>runTest("sms")}>Testar SMS</button></ChannelCard>
+    <ChannelCard title="E-mail" icon="@" online={!!form.configuracoes?.email?.ativo}><Field label="Endereço"><input value={form.email_endereco||""} onChange={e=>setForm({...form,email_endereco:e.target.value})}/></Field><Field label="SMTP Host"><input value={form.configuracoes?.email?.smtp_host||""} onChange={e=>setC("email","smtp_host",e.target.value)}/></Field><Field label="SMTP Usuário"><input value={form.configuracoes?.email?.smtp_user||""} onChange={e=>setC("email","smtp_user",e.target.value)}/></Field><Field label="SMTP Senha" secret><input type="password" value={form.configuracoes?.email?.smtp_password||""} onChange={e=>setC("email","smtp_password",e.target.value)}/></Field><label className="switchRow"><input type="checkbox" checked={!!form.configuracoes?.email?.ativo} onChange={e=>setC("email","ativo",e.target.checked)}/><span>Online</span></label><button className="btn" onClick={()=>runTest("email")}>Testar SMTP</button></ChannelCard>
+  </div><div className="panel"><div className="toolbar"><PanelTitle title="Central de canais" subtitle="Salve as credenciais e o estado operacional de cada canal."/><button className="btn primary" onClick={()=>onSave(form)}>Salvar canais</button></div>{test&&<div className="notice">{test}</div>}</div></div>
 }
 
-function Reports({ leads, npd, calls, returns }: { leads: Lead[]; npd: any[]; calls: any[]; returns: any[] }) {
-  return (
-    <div className="panel">
-      <PanelTitle title="Relatórios Gerais" subtitle="Consolidado estatístico da operação." />
-      <div className="metricsGrid">
-        <Metric title="Total de Leads" value={leads.length} icon="◉" hint="" />
-        <Metric title="Total de Ligações" value={calls.length} icon="▥" hint="" />
-        <Metric title="Bloqueios NPD" value={npd.length} icon="⊘" hint="" />
-        <Metric title="Retornos Pendentes" value={returns.length} icon="◷" hint="" />
-      </div>
-    </div>
-  );
+function Reports({ leads, npd, calls, returns, users }: { leads: Lead[]; npd: any[]; calls: any[]; returns: any[]; users: UserRow[] }) {
+  const [range,setRange]=useState("7d"),[op,setOp]=useState("all");
+  const now=Date.now();
+  const start=range==="today"?new Date(new Date().setHours(0,0,0,0)).getTime():range==="month"?new Date(new Date().getFullYear(),new Date().getMonth(),1).getTime():now-7*86400000;
+  const rows=calls.filter((c:any)=>{const t=new Date(c.created_at||c.inicio||0).getTime();return t>=start&&(op==="all"||c.operador_id===op)});
+  const counts=rows.reduce((a:any,c:any)=>(a[c.resultado||"Sem resultado"]=(a[c.resultado||"Sem resultado"]||0)+1,a),{});
+  const answered=rows.filter((c:any)=>!["Não atendeu","Não atendido","Número inválido"].includes(c.resultado)).length;
+  const conversion=rows.length?Math.round(answered/rows.length*100):0;
+  const exportRows=rows.map((c:any)=>({data:c.created_at,nome:c.leads?.nome||"",cpf:c.leads?.cpf||"",operador:users.find(u=>u.id===c.operador_id)?.nome||c.operador_id||"",resultado:c.resultado||"",observacao:c.observacao||""}));
+  const download=(excel:boolean)=>{if(excel){const ws=XLSX.utils.json_to_sheet(exportRows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Chamadas");XLSX.writeFile(wb,"relatorio-chamadas.xlsx");}else{const keys=Object.keys(exportRows[0]||{data:"",nome:"",cpf:"",operador:"",resultado:""});const csv=[keys.join(","),...exportRows.map((r:any)=>keys.map(k=>JSON.stringify(r[k]??"")).join(","))].join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="relatorio-chamadas.csv";a.click();}};
+  return <div className="stack"><div className="panel"><div className="toolbar"><PanelTitle title="Relatórios operacionais" subtitle="Filtre ligações por período e operador."/><div className="filterRow"><select value={range} onChange={e=>setRange(e.target.value)}><option value="today">Hoje</option><option value="7d">7 dias</option><option value="month">Mês</option></select><select value={op} onChange={e=>setOp(e.target.value)}><option value="all">Todos os operadores</option>{users.map(u=><option key={u.id} value={u.id}>{u.nome}</option>)}</select><button className="btn" onClick={()=>download(false)}>CSV</button><button className="btn primary" onClick={()=>download(true)}>Excel</button></div></div><div className="metricsGrid"><Metric title="Ligações" value={rows.length} icon="☎" hint="período"/><Metric title="Conversão" value={conversion+"%"} icon="↗" hint="contatos com resultado"/><Metric title="NPD" value={npd.length} icon="⊘" hint="ativos"/><Metric title="Retornos" value={returns.length} icon="◷" hint="pendentes"/></div></div>
+  <div className="panel"><PanelTitle title="Conversão por status" subtitle="Distribuição das tabulações no período."/><div className="barList">{Object.entries(counts).map(([k,v]:any)=><div className="barRow" key={k}><span>{k}</span><b>{v}</b></div>)}</div></div>
+  <div className="panel"><PanelTitle title="Chamadas efetuadas" subtitle={rows.length+" registros encontrados."}/><div className="tableWrap"><table><thead><tr><th>Data</th><th>Lead</th><th>Operador</th><th>Resultado</th></tr></thead><tbody>{rows.map((c:any)=><tr key={c.id}><td>{new Date(c.created_at||c.inicio).toLocaleString()}</td><td>{c.leads?.nome||"—"}</td><td>{users.find(u=>u.id===c.operador_id)?.nome||"—"}</td><td><span className="tag">{c.resultado||"—"}</span></td></tr>)}</tbody></table></div></div></div>
 }
 
-function Npd({ rows, onRemove }: { rows: any[]; onRemove: (r: any) => void }) {
-  return (
-    <div className="panel">
-      <PanelTitle title="Não Perturbe (NPD)" subtitle="Lista de bloqueios solicitados por clientes." />
-      <div className="tableWrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>CPF / Telefone</th>
-              <th>Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>{r.nome || "-"}</td>
-                <td>{r.cpf ? mask(r.cpf) : r.telefone || "-"}</td>
-                <td>
-                  <button className="btn dangerBtn" onClick={() => onRemove(r)}>
-                    Remover Bloqueio
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+function Npd({ rows, onRemove, onAdd }: { rows: any[]; onRemove: (r: any) => void; onAdd: (rows: Array<any>) => void }) {
+  const [q,setQ]=useState(""),[motivo,setMotivo]=useState("Solicitação de não contato"),[telefone,setTelefone]=useState(""),[cpfValue,setCpfValue]=useState(""),[nome,setNome]=useState(""),[file,setFile]=useState<File|null>(null);
+  const filtered=rows.filter(r=>[r.nome,r.cpf,r.telefone,r.motivo].join(" ").toLowerCase().includes(q.toLowerCase()));
+  const importFile=async()=>{if(!file)return;try{const parsed=await parseFile(file);onAdd(parsed.rows.map((r:any)=>({cpf:r.cpf,telefone:r.telefone,nome:r.nome,motivo})));setFile(null);}catch{setTimeout(()=>{},0)}};
+  return <div className="stack"><div className="panel"><PanelTitle title="Cadastrar bloqueio" subtitle="Bloqueie por telefone ou CPF e retire o contato da operação."/><div className="formGrid"><Field label="Nome"><input value={nome} onChange={e=>setNome(e.target.value)} placeholder="Opcional"/></Field><Field label="Telefone"><input value={telefone} onChange={e=>setTelefone(e.target.value)} placeholder="(79) 99999-9999"/></Field><Field label="CPF"><input value={cpfValue} onChange={e=>setCpfValue(e.target.value)} placeholder="000.000.000-00"/></Field><Field label="Motivo"><input value={motivo} onChange={e=>setMotivo(e.target.value)}/></Field></div><div className="inlineActions"><button className="btn primary" onClick={()=>{onAdd([{nome,telefone,cpf:cpfValue,motivo}]);setNome("");setTelefone("");setCpfValue("");}}>Bloquear contato</button><label className="fileBtn">Importar lista<input type="file" accept=".csv,.xlsx,.xls" onChange={e=>setFile(e.target.files?.[0]||null)}/></label>{file&&<button className="btn" onClick={importFile}>Processar {file.name}</button>}</div></div>
+  <div className="panel"><div className="toolbar"><PanelTitle title="Lista Não Perturbe" subtitle={filtered.length+" bloqueios ativos"}/><input className="fieldInput compact" value={q} onChange={e=>setQ(e.target.value)} placeholder="Pesquisar telefone, CPF ou nome"/></div><div className="tableWrap"><table><thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Motivo</th><th>Data</th><th>Ação</th></tr></thead><tbody>{filtered.map(r=><tr key={r.id}><td>{r.nome||"—"}</td><td>{r.cpf?mask(r.cpf):"—"}</td><td>{r.telefone||"—"}</td><td>{r.motivo||"—"}</td><td>{r.data_bloqueio?new Date(r.data_bloqueio).toLocaleDateString():"—"}</td><td><button className="btn dangerBtn" onClick={()=>onRemove(r)}>Remover</button></td></tr>)}</tbody></table></div></div></div>
 }
 
-function Settings({
-  operator,
-  users,
-  onSaveUser,
-  channelConfig,
-  onSaveChannels,
-  dialerConfig,
-  onSaveDialer,
-}: {
-  operator: any;
-  users: UserRow[];
-  onSaveUser: any;
-  channelConfig: any;
-  onSaveChannels: any;
-  dialerConfig: any;
-  onSaveDialer: any;
-}) {
-  return (
-    <div className="panel">
-      <PanelTitle title="Configurações do Sistema" subtitle="Gerenciamento de operadores e permissões." />
-      <div className="tableWrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Operador</th>
-              <th>Perfil</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id}>
-                <td>{u.nome}</td>
-                <td>{u.perfil}</td>
-                <td>{u.ativo ? "Ativo" : "Inativo"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+function Settings({ operator, users, onSaveUser, channelConfig, onSaveChannels, dialerConfig, onSaveDialer }: { operator:any; users:UserRow[]; onSaveUser:any; channelConfig:any; onSaveChannels:any; dialerConfig:any; onSaveDialer:any }) {
+  const [show,setShow]=useState(false),[name,setName]=useState(""),[email,setEmail]=useState(""),[password,setPassword]=useState(""),[profile,setProfile]=useState("operador"),[active,setActive]=useState(true);
+  const [currentPw,setCurrentPw]=useState(""),[newPw,setNewPw]=useState("");
+  const perms=["dashboard","discador","crm","resultados","leads","campanhas","retornos","telefonia","mensagens","relatorios","npd","config"];
+  const [rules,setRules]=useState<any>(dialerConfig?.regras||{max_tentativas:3, respeitar_npd:true, janela_inicio:"08:00", janela_fim:"18:00"});
+  useEffect(()=>setRules(dialerConfig?.regras||{max_tentativas:3,respeitar_npd:true,janela_inicio:"08:00",janela_fim:"18:00"}),[dialerConfig]);
+  const create=async()=>{const r=await fetch("/api/admin/operators",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({nome:name,email,senha:password,perfil:profile,ativo:active})});const j=await r.json();if(!r.ok)alert(j.error||"Não foi possível criar operador.");else{setShow(false);setName("");setEmail("");setPassword("");location.reload();}};
+  const changePassword=async()=>{const r=await fetch("/api/account/password",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({currentPassword:currentPw,password:newPw})});const j=await r.json();if(!r.ok)alert(j.error||"Falha ao alterar senha.");else{setCurrentPw("");setNewPw("");alert("Senha alterada.");}};
+  return <div className="stack"><div className="panel"><div className="toolbar"><PanelTitle title="Equipe e permissões" subtitle="Cadastre operadores e controle os módulos disponíveis."/><button className="btn primary" onClick={()=>setShow(true)}>＋ Novo operador</button></div><div className="tableWrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead><tbody>{users.map(u=><tr key={u.id}><td>{u.nome}</td><td>{u.email||"—"}</td><td>{u.perfil}</td><td><span className="tag">{u.ativo?"Ativo":"Inativo"}</span></td><td>{operator?.perfil==="admin"&&<UserEditor user={u} onSave={onSaveUser} perms={perms}/>}</td></tr>)}</tbody></table></div></div>
+  <div className="panel"><PanelTitle title="Conta e segurança" subtitle="Atualize sua senha sem sair da central."/><div className="formGrid"><Field label="Senha atual"><input type="password" value={currentPw} onChange={e=>setCurrentPw(e.target.value)}/></Field><Field label="Nova senha"><input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)}/></Field></div><button className="btn primary" onClick={changePassword}>Alterar senha</button></div>
+  <div className="panel"><PanelTitle title="Regras operacionais" subtitle="Aplicadas ao discador e à fila."/><div className="formGrid"><Field label="Máximo de tentativas"><input type="number" min="1" value={rules.max_tentativas||3} onChange={e=>setRules({...rules,max_tentativas:Number(e.target.value)})}/></Field><Field label="Janela inicial"><input type="time" value={rules.janela_inicio||"08:00"} onChange={e=>setRules({...rules,janela_inicio:e.target.value})}/></Field><Field label="Janela final"><input type="time" value={rules.janela_fim||"18:00"} onChange={e=>setRules({...rules,janela_fim:e.target.value})}/></Field></div><label className="switchRow"><input type="checkbox" checked={rules.respeitar_npd!==false} onChange={e=>setRules({...rules,respeitar_npd:e.target.checked})}/><span>Respeitar automaticamente a lista Não Perturbe</span></label><button className="btn primary" onClick={()=>onSaveDialer({...dialerConfig,regras:rules})}>Salvar regras</button></div>
+  {show&&<div className="modal" onClick={()=>setShow(false)}><div className="modalBox" onClick={e=>e.stopPropagation()}><div className="toolbar"><PanelTitle title="Novo operador" subtitle="A conta será criada no Supabase Auth e no cadastro operacional."/><button className="btn" onClick={()=>setShow(false)}>Fechar</button></div><div className="formGrid"><Field label="Nome"><input value={name} onChange={e=>setName(e.target.value)}/></Field><Field label="E-mail"><input type="email" value={email} onChange={e=>setEmail(e.target.value)}/></Field><Field label="Senha"><input type="password" value={password} onChange={e=>setPassword(e.target.value)}/></Field><Field label="Perfil"><select value={profile} onChange={e=>setProfile(e.target.value)}><option value="operador">Operador</option><option value="gestor">Gestor</option><option value="admin">Admin</option></select></Field></div><label className="switchRow"><input type="checkbox" checked={active} onChange={e=>setActive(e.target.checked)}/><span>Conta ativa</span></label><button className="btn primary full big" onClick={create}>Criar operador</button></div></div>}</div>
 }
 
-function LeadDrawer({
-  lead,
-  onClose,
-  onMove,
-  stages,
-}: {
-  lead: Lead;
-  onClose: () => void;
-  onMove: (id: string, s: string) => void;
-  stages: Stage[];
-}) {
-  return (
-    <div className="modal" onClick={onClose}>
-      <div className="modalBox" onClick={(e) => e.stopPropagation()}>
-        <div className="toolbar">
-          <div>
-            <h2>{lead.nome}</h2>
-            <p>{lead.cpf ? mask(lead.cpf) : "CPF não cadastrado"}</p>
-          </div>
-          <button className="btn" onClick={onClose}>
-            Fechar
-          </button>
-        </div>
-        <div className="field">
-          <label>Status Atual</label>
-          <select value={lead.status} onChange={(e) => onMove(lead.id, e.target.value)}>
-            <option value="disponivel">Disponível</option>
-            <option value="interessado">Interessado</option>
-            <option value="simulacao">Simulação</option>
-            <option value="proposta">Proposta</option>
-            <option value="contrato">Contrato</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  );
-}
+function UserEditor({user,onSave,perms}:{user:UserRow;onSave:any;perms:string[]}){const [open,setOpen]=useState(false),[profile,setProfile]=useState(user.perfil),[active,setActive]=useState(user.ativo),[p,setP]=useState<Record<string,boolean>>(user.permissoes||{});return <>{<button className="btn" onClick={()=>setOpen(true)}>Permissões</button>}{open&&<div className="modal" onClick={()=>setOpen(false)}><div className="modalBox smallModal" onClick={e=>e.stopPropagation()}><div className="toolbar"><h2>Editar operador</h2><button className="btn" onClick={()=>setOpen(false)}>Fechar</button></div><Field label="Perfil"><select value={profile} onChange={e=>setProfile(e.target.value)}><option value="operador">Operador</option><option value="gestor">Gestor</option><option value="admin">Admin</option></select></Field><label className="switchRow"><input type="checkbox" checked={active} onChange={e=>setActive(e.target.checked)}/><span>Ativo</span></label><div className="permGrid">{perms.map(x=><label key={x}><input type="checkbox" checked={p[x]!==false} onChange={e=>setP({...p,[x]:e.target.checked})}/>{x}</label>)}</div><button className="btn primary full" onClick={()=>{onSave(user.id,p,{},active,profile);setOpen(false)}}>Salvar</button></div></div>}</>}
+
+function Field({label,children,secret}:{label:string;children:React.ReactNode;secret?:boolean}){return <div className="field"><label>{label}</label>{children}</div>}
+
+function ChannelCard({title,icon,online,children}:{title:string;icon:string;online:boolean;children:React.ReactNode}){return <div className="channelCard"><div className="channelHead"><div className="channelIcon">{icon}</div><div><b>{title}</b><small><span className={online?"statusDot":"statusDot off"}/>{online?"Online":"Offline"}</small></div></div>{children}</div>}
+
+function LeadDrawer
 
 function ImportModal({
   files,
