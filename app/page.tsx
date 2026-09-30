@@ -50,6 +50,27 @@ export default function Home(){
  useEffect(()=>{if(session)loadOperator()},[session]);
  useEffect(()=>setPage(1),[search]);
  useEffect(()=>{if(session)load(mode)},[mode]);
+ useEffect(()=>{
+  if(!session||!supabase)return;
+  let stopped=false;
+  const checkReturns=async()=>{
+    const now=new Date();
+    const {data}=await supabase.from("retornos").select("id,data_hora,leads(nome)").eq("concluido",false).lte("data_hora",new Date(now.getTime()+1000).toISOString()).order("data_hora",{ascending:true}).limit(10);
+    if(stopped)return;
+    for(const row of (data||[])){
+      const key="ak:return-notified:"+row.id;
+      if(!localStorage.getItem(key)){
+        localStorage.setItem(key,"1");
+        const name=(row as any).leads?.nome||"cliente";
+        setMsg("Retorno no horário: "+name);
+        if("Notification" in window && Notification.permission==="granted") new Notification("A&K Call Center — Retorno", {body:"Retorno agendado com "+name+" está no horário."});
+      }
+    }
+  };
+  void checkReturns();
+  const timer=window.setInterval(checkReturns,1000);
+  return()=>{stopped=true;window.clearInterval(timer)};
+ },[session]);
 
  async function load(targetMode=mode){
   if(!supabase)return;
