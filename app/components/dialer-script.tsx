@@ -211,14 +211,14 @@ export default function DialerScript() {
       const phone = String(document.querySelector(".dialNumber")?.textContent || "").replace(/\D/g, "");
       const name = String(document.querySelector(".person h2")?.textContent || "").trim();
       if (!phone || !name || !document.querySelector(".callPanel")) { remove(); lastKey = ""; return; }
-      if (!supabase) { render(name, phone, "Atendimento", leadId); return; }
+      if (!supabase) { render(name, phone, "Atendimento", ""); return; }
       const { data: phones } = await supabase.from("telefones").select("lead_id").eq("numero_normalizado", phone).eq("ativo", true).limit(1);
       const leadId = phones?.[0]?.lead_id;
-      if (!leadId) { render(name, phone, "Atendimento"); return; }
+      if (!leadId) { render(name, phone, "Atendimento", ""); return; }
       const { data: lead } = await supabase.from("leads").select("produto,dados_extras").eq("id", leadId).maybeSingle();
       const imported = lead?.dados_extras?._importacao || {};
       const product = String(imported.produto_original || lead?.produto || "Atendimento").replace(/\s*•\s*Banco:\s*.+$/i, "").trim();
-      render(name, phone, product || "Atendimento");
+      render(name, phone, product || "Atendimento", leadId);
     };
 
     const schedule = () => { window.setTimeout(() => void load(), 80); };
