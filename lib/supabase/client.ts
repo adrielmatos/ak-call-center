@@ -12,19 +12,49 @@ type AuthSubscription = ReturnType<
   SupabaseClient["auth"]["onAuthStateChange"]
 >;
 
+/**
+ * These are intentionally PUBLIC Supabase values.
+ * A publishable/anon key is designed to be present in browser applications;
+ * never put service_role or secret keys here.
+ *
+ * The fallback exists because NEXT_PUBLIC_* values are compile-time values in
+ * Next.js client bundles. If a Vercel deployment was built without them, the
+ * application can still connect to this known Supabase project instead of
+ * failing during the initial React render.
+ */
+const FALLBACK_PUBLIC_CONFIG: PublicConfig = {
+  url: "https://vtwyojpsrjyigsnnfawa.supabase.co",
+  key: "sb_publishable_wBm4Vdroz5rdxo8T5glEqA_npwFbbpP",
+};
+
 let browserClient: SupabaseClient | null = null;
 
 function getPublicConfig(): PublicConfig {
-  // NEXT_PUBLIC_* values are embedded by Next.js at build time.
-  // Keep both Supabase public key names for compatibility with existing
-  // Vercel projects created with the older ANON_KEY convention.
-  const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
-
-  const key = String(
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-      "",
+  // Next.js replaces NEXT_PUBLIC_* references at build time for browser code.
+  // Keep both modern publishable and legacy anon names for compatibility.
+  const envUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
+  const envPublishableKey = String(
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "",
   ).trim();
+  const envAnonKey = String(
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+  ).trim();
+
+  const url = envUrl || FALLBACK_PUBLIC_CONFIG.url;
+  const key = envPublishableKey || envAnonKey || FALLBACK_PUBLIC_CONFIG.key;
+
+  if (typeof window !== "undefined") {
+    // Diagnostic logging deliberately reports only presence/source metadata.
+    // Never log the URL value, API key, JWT, service_role key, or secret key.
+    console.info("[Supabase] browser bundle configuration", {
+      urlFromEnv: Boolean(envUrl),
+      publishableKeyFromEnv: Boolean(envPublishableKey),
+      anonKeyFromEnv: Boolean(envAnonKey),
+      usingFallbackUrl: !envUrl,
+      usingFallbackKey: !envPublishableKey && !envAnonKey,
+      resolved: Boolean(url && key),
+    });
+  }
 
   return { url, key };
 }
@@ -39,17 +69,8 @@ function assertBrowser(): void {
 
 function assertConfig(config: PublicConfig): void {
   if (!config.url || !config.key) {
-    const missing = [
-      !config.url ? "NEXT_PUBLIC_SUPABASE_URL" : null,
-      !config.key
-        ? "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ou NEXT_PUBLIC_SUPABASE_ANON_KEY"
-        : null,
-    ]
-      .filter(Boolean)
-      .join(" e ");
-
     throw new Error(
-      `Supabase não está configurado no bundle de produção. Variável(is) ausente(s): ${missing}. As variáveis NEXT_PUBLIC_* precisam existir no ambiente usado pelo deployment antes do build.`,
+      "Supabase não está configurado. Nenhuma configuração pública válida foi encontrada.",
     );
   }
 }
