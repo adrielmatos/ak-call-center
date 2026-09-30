@@ -51,7 +51,11 @@ export async function POST(request:Request){
   if(!lead)return NextResponse.json({error:{code:"lead_not_found",message:"Lead não encontrado."}},{status:404,headers:{"x-request-id":requestId}});
   if(lead.bloqueado||lead.opt_out)return NextResponse.json({error:{code:"lead_blocked",message:"Lead bloqueado para contato."}},{status:409,headers:{"x-request-id":requestId}});
   const cpfKey=String(lead.cpf||"").replace(/\D/g,"");
-  const phoneKey=String(lead.telefone||"").replace(/\D/g,"");
+  let phoneKey=String(lead.telefone||"").replace(/\D/g,"");
+  if(input.telefone_id){
+    const {data:telephone}=await supabase.from("telefones").select("numero_normalizado").eq("id",input.telefone_id).maybeSingle();
+    phoneKey=String(telephone?.numero_normalizado||phoneKey).replace(/\D/g,"");
+  }
   const npdMatches:any[]=[];
   if(cpfKey){
     const {data:rows}=await supabase.from("lista_nao_perturbe").select("id,cpf,telefone").eq("ativo",true).eq("cpf",cpfKey).limit(5);
