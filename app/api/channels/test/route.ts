@@ -6,7 +6,7 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-    const { channel, to, message } = await request.json();
+    const { channel, to, message, lead_id, purpose } = await request.json();
     const { data: operator } = await supabase.from("operadores").select("id").eq("auth_user_id", user.id).maybeSingle();
     if (!operator) return NextResponse.json({ error: "Operador não encontrado." }, { status: 403 });
     const { data: row, error } = await supabase.from("configuracoes_canais").select("configuracoes").eq("operador_id", operator.id).maybeSingle();
@@ -24,7 +24,13 @@ export async function POST(request: Request) {
     });
     const body = await upstream.text();
     if (!upstream.ok) return NextResponse.json({ error: "O provedor respondeu HTTP " + upstream.status, detail: body.slice(0,500) }, { status: 502 });
-    return NextResponse.json({ ok:true, status:upstream.status, detail:body.slice(0,500) });
+    if(lead_id){
+      const {data:conversation}=await supabase.from("crm_conversas").upsert({lead_id,canal:channel,status:"aberta",responsavel_id:operator.id,ultima_mensagem_at:new Date().toISOString(),updated_at:new Date().toISOString()},{onConflict:"lead_id,canal"}).select("id").maybeSingle();
+      if(conversation?.id){
+        await supabase.from("crm_mensagens").insert({conversa_id:conversation.id,lead_id,operador_id:operator.id,direcao:"saida",conteudo:String(message||""),status:"enviada"});
+      }
+    }
+    return NextResponse.json({ ok:true, status:upstream.status, purpose:purpose||null, detail:body.slice(0,500) });
   } catch (error:any) {
     return NextResponse.json({ error:error?.message||"Falha no teste do canal." }, { status:500 });
   }
