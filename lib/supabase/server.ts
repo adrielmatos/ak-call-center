@@ -9,18 +9,29 @@ type SupabasePublicConfig = {
   key: string;
 };
 
+// Public browser-safe fallback keeps the server client from crashing when a
+// deployment was created without NEXT_PUBLIC_* values. The service-role client
+// below remains strict and never falls back to a public key.
+const FALLBACK_PUBLIC_CONFIG: SupabasePublicConfig = {
+  url: "https://vtwyojpsrjyigsnnfawa.supabase.co",
+  key: "sb_publishable_wBm4Vdroz5rdxo8T5glEqA_npwFbbpP",
+};
+
 function getPublicConfig(): SupabasePublicConfig {
   const url = String(
     process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   ).trim();
 
-  const key = String(
+  const envKey = String(
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       "",
   ).trim();
 
-  return { url, key };
+  return {
+    url: url || FALLBACK_PUBLIC_CONFIG.url,
+    key: envKey || FALLBACK_PUBLIC_CONFIG.key,
+  };
 }
 
 function assertPublicConfig(
@@ -28,7 +39,7 @@ function assertPublicConfig(
 ): void {
   if (!config.url || !config.key) {
     throw new Error(
-      "Supabase não está configurado no servidor. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+      "Supabase público não está configurado no servidor.",
     );
   }
 }
