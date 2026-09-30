@@ -1869,7 +1869,32 @@ function Field({label,children,secret}:{label:string;children:React.ReactNode;se
 
 function ChannelCard({title,icon,online,children}:{title:string;icon:string;online:boolean;children:React.ReactNode}){return <div className="channelCard"><div className="channelHead"><div className="channelIcon">{icon}</div><div><b>{title}</b><small><span className={online?"statusDot":"statusDot off"}/>{online?"Online":"Offline"}</small></div></div>{children}</div>}
 
-function LeadDrawer
+function LeadDrawer({
+  lead,
+  onClose,
+  onMove,
+  stages,
+}: {
+  lead: Lead;
+  onClose: () => void;
+  onMove: (id: string, s: string) => void;
+  stages: Stage[];
+}) {
+  const options = stages.length ? stages : [
+    { id: "disponivel", nome: "Disponível", cor: "#94a3b8", ordem: 0 },
+    { id: "interessado", nome: "Interessado", cor: "#3b82f6", ordem: 1 },
+    { id: "simulacao", nome: "Simulação", cor: "#8b5cf6", ordem: 2 },
+    { id: "proposta", nome: "Proposta", cor: "#eab308", ordem: 3 },
+    { id: "contrato", nome: "Contrato", cor: "#22c55e", ordem: 4 },
+  ];
+  return <div className="modal" onClick={onClose}>
+    <div className="modalBox" onClick={e=>e.stopPropagation()}>
+      <div className="toolbar"><div><div className="eyebrow">LEAD</div><h2>{lead.nome}</h2><p>{lead.cpf?mask(lead.cpf):"CPF não cadastrado"} {lead.cidade?("• "+lead.cidade):""}</p></div><button className="btn" onClick={onClose}>Fechar</button></div>
+      <div className="detailGrid"><div><b>Produto</b><span>{lead.produto||"Consignado"}</span></div><div><b>Telefone</b><span>{lead.telefones?.[0]?.numero_normalizado||"—"}</span></div><div><b>Prioridade</b><span>{lead.prioridade}</span></div></div>
+      <div className="field"><label>Etapa do CRM</label><select value={lead.status} onChange={e=>{onMove(lead.id,e.target.value);onClose();}}>{options.map(s=><option key={s.id} value={s.id}>{s.nome}</option>)}</select></div>
+    </div>
+  </div>;
+}
 
 function ImportModal({
   files,
