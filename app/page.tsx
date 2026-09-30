@@ -404,8 +404,8 @@ async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,
   </aside>
   <main className="content">
    <header className="header"><div><div className="eyebrow">CENTRAL OPERACIONAL • ONLINE</div><h1>{nav.find(x=>x[0]===mode)?.[1]}</h1><p>Operação de consignado, CRM e telefonia em um único painel.</p></div><div className="headActions"><span className="online"><b/> Sistema online • v{APP_VERSION}</span><button className="btn primary" onClick={()=>setShowImport(true)}>＋ Nova importação</button></div></header>
-   {error&&<div className="alert error"><b>Erro:</b> {error}<button onClick={()=>setError("")}>×</button></div>}
-   {msg&&<div className="alert success">{msg}<button onClick={()=>setMsg("")}>×</button></div>}
+   {mode!=="discador"&&error&&<div className="alert error"><b>Erro:</b> {error}<button onClick={()=>setError("")}>×</button></div>}
+   {mode!=="discador"&&msg&&<div className="alert success">{msg}<button onClick={()=>setMsg("")}>×</button></div>}
    {mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length} campaigns={campaigns.length} returns={returns} calls={calls} loading={loading} dialerConfig={dialerConfig} onSaveDialer={saveDialer}/>}
    {mode==="discador"&&<Dialer lead={current} available={available.length} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>callResult(r)} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} scripts={scripts} operator={operator}/>}
    {mode==="crm"&&<DeskCRM leads={leads} stages={stages} onMove={moveLead} onOpen={setSelectedLead} onChannel={sendChannel} operator={operator}/>}   {mode==="resultados"&&<OperationalResults leads={leads} onOpen={setSelectedLead}/>}
@@ -507,8 +507,7 @@ function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,scrip
  useEffect(()=>{setCalling(false);setShowReturn(false);setObs("")},[lead?.id]);
  useEffect(()=>{if(paused||!lead)return;const t=window.setTimeout(()=>{setCalling(true);onCall()},800);return()=>window.clearTimeout(t)},[paused,lead?.id]);
  const finish=(result:string)=>{setCalling(false);onResult(result)};
- return <div className="stack">
-  <div className="panel dialQueueBar"><div className="dialHeader"><span className="statusDot"/>Fila ativa <b>{available}</b><span className="dialAutoStatus">Discagem automática ativa</span></div></div>
+ return <div className="dialerPage">
   {lead?<div className="dialGrid">
    <div className="dialerLeft">
     <section className="panel callPanel">
@@ -523,7 +522,6 @@ function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,scrip
       <button className="btn" onClick={()=>onChannel("whatsapp",lead)}>💬 Enviar simulação</button>
       <button className="btn dangerBtn" onClick={onBlock}>⊘ Não ligar mais</button>
      </div>
-     <div className="callHint">A ligação inicia automaticamente. Depois da conversa, escolha uma <b>tabulação</b> abaixo; o próximo lead será carregado sozinho.</div>
     </section>
     <section className="panel tabulationPanel">
      <PanelTitle title="Tabulação da ligação" subtitle="Escolha o resultado. O lead atual será encerrado e o próximo será carregado automaticamente."/>
@@ -531,13 +529,12 @@ function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,scrip
     </section>
    </div>
    <section className="panel scriptPanel">
-    <PanelTitle title="Script do discador" subtitle="Roteiro sincronizado com Scripts de ligação."/>
+    <PanelTitle title="Script do discador" subtitle="Roteiro do produto do lead atual."/>
     <div className="scriptCard">
      <div className="eyebrow">{lead.produto||"CONSIGNADO"}</div>
      <p>Cliente: <b>{lead.nome}</b></p>
      <p>{lead.telefones?.[0]?.numero_normalizado||"—"}</p>
      <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.55,margin:0}}>{fillScript(resolveScript(scripts,lead.produto||"Atendimento"),lead,operator)}</pre></div>
-     <div className="info">Edite este roteiro em <b>Scripts de ligação</b>. A alteração é compartilhada automaticamente com todos os leads desse produto.</div>
     </div>
    </section>
   </div>:<section className="panel"><Empty title="Fila vazia" text="Importe uma lista para iniciar a operação."/></section>}
