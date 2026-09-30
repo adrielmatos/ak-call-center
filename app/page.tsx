@@ -1495,56 +1495,22 @@ function Dialer({
   );
 }
 
-function DeskCRM({
-  leads,
-  stages,
-  onMove,
-  onOpen,
-  operator,
-}: {
-  leads: Lead[];
-  stages: Stage[];
-  onMove: (id: string, s: string) => void;
-  onOpen: (l: Lead) => void;
-  operator: any;
-}) {
-  const defaultStages = [
-    { id: "disponivel", nome: "Disponível", cor: "#94a3b8" },
-    { id: "interessado", nome: "Interessado", cor: "#3b82f6" },
-    { id: "simulacao", nome: "Simulação", cor: "#8b5cf6" },
-    { id: "proposta", nome: "Proposta", cor: "#eab308" },
-    { id: "contrato", nome: "Contrato", cor: "#22c55e" },
-  ];
-  const activeStages = stages.length ? stages : defaultStages;
-
-  return (
-    <div className="crmBoard">
-      {activeStages.map((st) => {
-        const stageLeads = leads.filter(
-          (l) => l.status?.toLowerCase() === st.nome.toLowerCase() || l.status === st.id
-        );
-        return (
-          <div key={st.id} className="crmColumn">
-            <div className="crmHeader">
-              <span>{st.nome}</span>
-              <b>{stageLeads.length}</b>
-            </div>
-            <div className="crmCards">
-              {stageLeads.map((lead) => (
-                <div key={lead.id} className="crmCard" onClick={() => onOpen(lead)}>
-                  <b>{lead.nome}</b>
-                  <p>{lead.cpf ? mask(lead.cpf) : "CPF não informado"}</p>
-                  <div className="crmFooter">
-                    <span>{lead.produto || "Consignado"}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+function DeskCRM({leads,stages,onMove,onOpen,operator}:{leads:Lead[];stages:Stage[];onMove:(id:string,s:string)=>void;onOpen:(l:Lead)=>void;operator:any}) {
+  const defaults=[{id:"disponivel",nome:"Novo",cor:"#94a3b8",ordem:0},{id:"interessado",nome:"Contato",cor:"#3b82f6",ordem:1},{id:"interessado",nome:"Interessado",cor:"#2563eb",ordem:2},{id:"simulacao",nome:"Simulação",cor:"#8b5cf6",ordem:3},{id:"proposta",nome:"Proposta",cor:"#eab308",ordem:4},{id:"contrato",nome:"Contrato",cor:"#22c55e",ordem:5}];
+  const active=stages.length?stages:defaults;
+  const [drag,setDrag]=useState<string|null>(null);
+  const matches=(lead:Lead,st:Stage)=>lead.status===st.id || lead.status?.toLowerCase()===st.nome.toLowerCase() || (st.nome==="Novo"&&lead.status==="disponivel");
+  return <div className="crmBoard">
+    {active.map((st,i)=>{const rows=leads.filter(l=>matches(l,st));return <div className="crmColumn" key={st.id+"-"+i} onDragOver={e=>e.preventDefault()} onDrop={()=>{if(drag)onMove(drag,st.id);setDrag(null);}}>
+      <div className="crmHeader"><div><span className="stageDot" style={{background:st.cor}}/>{st.nome}</div><b>{rows.length}</b></div>
+      <div className="crmCards">{rows.map(lead=><article key={lead.id} className="crmCard" draggable onDragStart={()=>setDrag(lead.id)} onDragEnd={()=>setDrag(null)} onClick={()=>onOpen(lead)}>
+        <div className="crmCardTop"><b>{lead.nome}</b><span>{lead.prioridade>0?"P"+lead.prioridade:""}</span></div>
+        <p>{lead.cpf?mask(lead.cpf):"CPF não informado"}</p><small>{lead.cidade||"Cidade não informada"}{lead.uf?" • "+lead.uf:""}</small>
+        <div className="crmFooter"><span>{lead.produto||"Consignado"}</span><button className="miniBtn" onClick={e=>{e.stopPropagation();onMove(lead.id,st.id)}}>Mover</button></div>
+      </article>)}</div>
+      {!rows.length&&<div className="dropHint">Arraste um lead para esta etapa</div>}
+    </div>})}
+  </div>;
 }
 
 function OperationalResults({ leads, onOpen }: { leads: Lead[]; onOpen: (l: Lead) => void }) {
