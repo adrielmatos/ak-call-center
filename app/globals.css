@@ -163,3 +163,44 @@
 @media(max-width:1200px){.dialGrid{grid-template-columns:1fr}.scriptPanel{order:2}.dialerLeft{order:1}.tabulationPanel .resultGrid{grid-template-columns:repeat(5,minmax(0,1fr))}}
 @media(max-width:600px){.dialGrid{grid-template-columns:1fr}.person h2{font-size:19px}.leadMeta{gap:5px}.dialerActions .btn{flex:1 1 auto}.tabulationPanel .resultGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.scriptPanel .scriptBlock{max-height:none}}
 
+
+/* Discador — tela de operação completa, legível e sem elementos redundantes */
+.dialerPage{width:100%;height:calc(100vh - 156px);min-height:560px}
+.dialerPage .dialGrid{height:100%;min-height:0;grid-template-columns:minmax(0,1.02fr) minmax(390px,.98fr);gap:14px}
+.dialerPage .dialerLeft{height:100%;min-height:0;grid-template-rows:auto minmax(0,1fr);gap:12px}
+.dialerPage .callPanel{padding:18px}
+.dialerPage .person{margin-top:0}
+.dialerPage .personAvatar{width:56px;height:56px;font-size:18px}
+.dialerPage .person h2{font-size:25px;line-height:1.15}
+.dialerPage .person p{font-size:12px;margin-top:5px}
+.dialerPage .leadMeta{margin:11px 0;gap:8px}
+.dialerPage .leadProduct,.dialerPage .leadPhone{padding:7px 10px;font-size:11px}
+.dialerPage .callState{font-size:11px;margin:9px 0 12px}
+.dialerPage .dialerActions{gap:7px}
+.dialerPage .dialerActions .btn{padding:9px 11px;font-size:11px;line-height:1.15}
+.dialerPage .tabulationPanel{padding:15px;min-height:0;overflow:hidden}
+.dialerPage .tabulationPanel .panelTitle{margin-bottom:10px}
+.dialerPage .tabulationPanel .panelTitle h3{font-size:15px}
+.dialerPage .tabulationPanel .panelTitle p{font-size:10px}
+.dialerPage .tabulationPanel .resultGrid{height:calc(100% - 45px);grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.dialerPage .tabulationPanel .resultGrid button{padding:10px 7px;font-size:11px;min-height:38px}
+.dialerPage .scriptPanel{height:100%;min-height:0;padding:17px;display:flex;flex-direction:column;overflow:hidden}
+.dialerPage .scriptPanel .panelTitle{margin-bottom:10px}
+.dialerPage .scriptPanel .panelTitle h3{font-size:15px}
+.dialerPage .scriptPanel .panelTitle p{font-size:10px}
+.dialerPage .scriptPanel .scriptCard{min-height:0;display:flex;flex-direction:column;flex:1}
+.dialerPage .scriptPanel .scriptCard>p{font-size:12px;margin:4px 0}
+.dialerPage .scriptPanel .scriptBlock{max-height:none;flex:1;overflow:auto;font-size:12px;line-height:1.55}
+.dialerPage .scriptPanel .eyebrow{font-size:10px}
+@media(max-width:1200px){
+ .dialerPage{height:auto;min-height:0}
+ .dialerPage .dialGrid{height:auto;grid-template-columns:1fr}
+ .dialerPage .dialerLeft{height:auto;grid-template-rows:auto auto}
+ .dialerPage .scriptPanel{height:auto;min-height:420px}
+ .dialerPage .tabulationPanel .resultGrid{height:auto;grid-template-columns:repeat(5,minmax(0,1fr))}
+}
+@media(max-width:760px){
+ .dialerPage .person h2{font-size:21px}
+ .dialerPage .dialerActions .btn{font-size:10px}
+ .dialerPage .tabulationPanel .resultGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
