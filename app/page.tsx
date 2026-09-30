@@ -424,7 +424,9 @@ function Dashboard({leads,available,npd,campaigns,returns,calls,loading,dialerCo
     </div>
     <div className="akOperations360Status">● ONLINE</div>
    </header>
-   <div className="akOperations360Metrics">    <Metric title="Leads na base" value={leads.length} icon="◉" hint="mailing carregado"/>
+
+   <div className="akOperations360Metrics">
+    <Metric title="Leads na base" value={leads.length} icon="◉" hint="mailing carregado"/>
     <Metric title="Na fila" value={available} icon="☎" hint="prontos para contato"/>
     <Metric title="Oportunidades" value={opportunities} icon="↗" hint="interesse ou proposta"/>
     <Metric title="Retornos" value={pendingReturns} icon="◷" hint="próximas ações"/>
@@ -432,12 +434,14 @@ function Dashboard({leads,available,npd,campaigns,returns,calls,loading,dialerCo
     <Metric title="Campanhas" value={campaigns} icon="▣" hint="cadastradas"/>
     <Metric title="Ligações" value={calls.length} icon="▥" hint="histórico carregado"/>
    </div>
+
    <div className="akOperations360Body">
     <div>
      <div className="eyebrow">CENTRAL DE TRABALHO</div>
      <h3>Uma visão única da operação</h3>
      <p>Use o menu lateral para entrar no Discador, CRM, Retornos, Relatórios e demais módulos. A Operação 360 fica exclusivamente nesta Visão geral.</p>
     </div>
+
     <div className="akOperations360Actions">
      <span>Fila ativa <b>{available}</b></span>
      <span>Retornos pendentes <b>{pendingReturns}</b></span>
@@ -445,7 +449,7 @@ function Dashboard({leads,available,npd,campaigns,returns,calls,loading,dialerCo
     </div>
    </div>
   </section>
-  <ScriptEditor config={dialerConfig} onSave={onSaveDialer}/>
+
   {loading&&<div className="loadingbar"/>}
  </div>;
 }
