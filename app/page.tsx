@@ -407,7 +407,7 @@ async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,
    {error&&<div className="alert error"><b>Erro:</b> {error}<button onClick={()=>setError("")}>×</button></div>}
    {msg&&<div className="alert success">{msg}<button onClick={()=>setMsg("")}>×</button></div>}
    {mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length} campaigns={campaigns.length} returns={returns} calls={calls} loading={loading} dialerConfig={dialerConfig} onSaveDialer={saveDialer}/>}
-   {mode==="discador"&&<Dialer lead={current} available={available.length} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>{setSkippedLeadId(null);callResult(r)}} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} onNextLead={()=>{if(current){setSkippedLeadId(current.id);setMsg("Próximo lead selecionado.")}}} scripts={scripts} operator={operator}/>}
+   {mode==="discador"&&<Dialer lead={current} available={available.length} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>callResult(r)} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} scripts={scripts} operator={operator}/>}
    {mode==="crm"&&<DeskCRM leads={leads} stages={stages} onMove={moveLead} onOpen={setSelectedLead} onChannel={sendChannel} operator={operator}/>}   {mode==="resultados"&&<OperationalResults leads={leads} onOpen={setSelectedLead}/>}
    {mode==="leads"&&<Leads leads={paged} loading={loading} search={search} setSearch={setSearch} page={page} setPage={setPage} total={filtered.length} pageSize={pageSize} onOpen={setSelectedLead}/>}
    {mode==="campanhas"&&<Campaigns rows={campaigns} onCreate={createCampaign} onToggle={toggleCampaign} onDelete={deleteCampaign}/>}
@@ -502,41 +502,46 @@ function ScriptManager({scripts,onSave,canEdit}:{scripts:CallScript[];onSave:(da
 function Metric({title,value,icon,hint}:{title:string;value:number;icon:string;hint:string}){return <div className="panel metric"><div className="metricIcon">{icon}</div><div><span>{title}</span><strong>{value}</strong><small>{hint}</small></div></div>}
 function PanelTitle({title,subtitle}:{title:string;subtitle:string}){return <div className="panelTitle"><div><h3>{title}</h3><p>{subtitle}</p></div></div>}
 
-function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,onNextLead,scripts,operator}:{lead?:Lead;available:number;onCall:()=>void;onResult:(r:string)=>void;onReturn:(dateTime:string,observacao:string)=>void;onBlock:()=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;onNextLead:()=>void;scripts:CallScript[];operator?:any}){
+function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,scripts,operator}:{lead?:Lead;available:number;onCall:()=>void;onResult:(r:string)=>void;onReturn:(dateTime:string,observacao:string)=>void;onBlock:()=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;scripts:CallScript[];operator?:any}){
  const[showReturn,setShowReturn]=useState(false),[paused,setPaused]=useState(false),[calling,setCalling]=useState(false),[dateTime,setDateTime]=useState(()=>{const d=new Date(Date.now()+86400000);d.setHours(9,0,0,0);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}),[obs,setObs]=useState("");
- useEffect(()=>{if(paused||!lead)return;const t=window.setTimeout(()=>{setCalling(true);onCall()},1200);return()=>window.clearTimeout(t)},[paused,lead?.id]);
+ useEffect(()=>{setCalling(false);setShowReturn(false);setObs("")},[lead?.id]);
+ useEffect(()=>{if(paused||!lead)return;const t=window.setTimeout(()=>{setCalling(true);onCall()},800);return()=>window.clearTimeout(t)},[paused,lead?.id]);
+ const finish=(result:string)=>{setCalling(false);onResult(result)};
  return <div className="stack">
-  <div className="panel"><div className="dialHeader"><span className="statusDot"/>Fila ativa <b>{available}</b><span style={{marginLeft:"auto"}}>Discagem automática ativa</span></div></div>
-  <div className="dialGrid">
-   <section className="panel callPanel">
-    {lead?<><div className="person"><div className="personAvatar">{initials(lead.nome)}</div><div><div className="eyebrow">PRÓXIMO CONTATO</div><h2>{lead.nome}</h2><p>{lead.cidade||"Cidade não informada"} {lead.uf&&"• "+lead.uf}</p></div></div>
-     <div className="dialNumber">{lead.telefones?.[0]?.numero_normalizado||"Sem telefone"}</div>
-     <div className="callActions">
-      <div className="btn callBtn" aria-live="polite">☎ {calling?"CHAMANDO":"AGUARDANDO CHAMADA AUTOMÁTICA"}</div>
-      <button className="btn" onClick={()=>{setCalling(false);onNextLead()}}>⇄ PRÓXIMO LEAD</button>
-      <button className="btn dangerBtn" onClick={()=>{setCalling(false);onResult("Não atendeu")}}>■ ENCERRAR</button>
-      <button className="btn dangerBtn" onClick={()=>setPaused(x=>!x)}>{paused?"▶ RETOMAR":"Ⅱ PAUSAR"}</button>
-      {whatsappHref(lead.telefones?.[0]?.numero_normalizado)&&<a className="btn" href={whatsappHref(lead.telefones?.[0]?.numero_normalizado)} target="_blank" rel="noreferrer">◉ WHATSAPP</a>}
-      <button className="btn" onClick={()=>setShowReturn(true)}>◷ AGENDAR RETORNO</button>
-      <button className="btn" onClick={()=>onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO</button>
-      <button className="btn dangerBtn" onClick={onBlock}>⊘ NÃO LIGAR MAIS</button>
+  <div className="panel dialQueueBar"><div className="dialHeader"><span className="statusDot"/>Fila ativa <b>{available}</b><span className="dialAutoStatus">Discagem automática ativa</span></div></div>
+  {lead?<div className="dialGrid">
+   <div className="dialerLeft">
+    <section className="panel callPanel">
+     <div className="person"><div className="personAvatar">{initials(lead.nome)}</div><div><div className="eyebrow">CONTATO ATUAL</div><h2>{lead.nome}</h2><p>{lead.cidade||"Cidade não informada"} {lead.uf&&"• "+lead.uf}</p></div></div>
+     <div className="leadMeta"><span className="leadProduct">🏦 {lead.produto||"Produto não informado"}</span><span className="leadPhone">☎ {lead.telefones?.[0]?.numero_normalizado||"Sem telefone"}</span></div>
+     <div className="callState"><span className="callStateDot"/>{calling?"CHAMANDO CLIENTE":"PREPARANDO CHAMADA AUTOMÁTICA"}</div>
+     <div className="callActions dialerActions">
+      <button className="btn dangerBtn" onClick={()=>finish("Não atendeu")}>■ Encerrar ligação</button>
+      <button className="btn dangerBtn" onClick={()=>setPaused(x=>!x)}>{paused?"▶ Retomar discagem":"Ⅱ Pausar discagem"}</button>
+      {whatsappHref(lead.telefones?.[0]?.numero_normalizado)&&<a className="btn" href={whatsappHref(lead.telefones?.[0]?.numero_normalizado)} target="_blank" rel="noreferrer">◉ WhatsApp</a>}
+      <button className="btn" onClick={()=>setShowReturn(true)}>◷ Agendar retorno</button>
+      <button className="btn" onClick={()=>onChannel("whatsapp",lead)}>💬 Enviar simulação</button>
+      <button className="btn dangerBtn" onClick={onBlock}>⊘ Não ligar mais</button>
      </div>
-    </>:<Empty title="Fila vazia" text="Importe uma lista para iniciar a operação."/>}
-   </section>
-   <section className="panel">
-    <PanelTitle title="Script do discador" subtitle="Script sincronizado com Scripts de ligação."/>
+     <div className="callHint">A ligação inicia automaticamente. Depois da conversa, escolha uma <b>tabulação</b> abaixo; o próximo lead será carregado sozinho.</div>
+    </section>
+    <section className="panel tabulationPanel">
+     <PanelTitle title="Tabulação da ligação" subtitle="Escolha o resultado. O lead atual será encerrado e o próximo será carregado automaticamente."/>
+     <div className="resultGrid">{results.map(r=><button key={r} onClick={()=>r==="Retorno"?setShowReturn(true):finish(r)}>{r}</button>)}</div>
+    </section>
+   </div>
+   <section className="panel scriptPanel">
+    <PanelTitle title="Script do discador" subtitle="Roteiro sincronizado com Scripts de ligação."/>
     <div className="scriptCard">
-     <div className="eyebrow">{lead?.produto||"CONSIGNADO"}</div>
-     <p>Cliente: <b>{lead?.nome||"—"}</b></p>
-     <p>{lead?.telefones?.[0]?.numero_normalizado||"—"}</p>
-     <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.6,margin:0}}>{fillScript(resolveScript(scripts,lead?.produto||"Atendimento"),lead,operator)}</pre></div>
-     <div className="callActions"><button className="btn primary" onClick={()=>lead&&onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO VIA WHATSAPP</button></div>
-     <div className="info">Edite este roteiro em Scripts de ligação. A alteração é compartilhada automaticamente com todos os leads desse produto.</div>
+     <div className="eyebrow">{lead.produto||"CONSIGNADO"}</div>
+     <p>Cliente: <b>{lead.nome}</b></p>
+     <p>{lead.telefones?.[0]?.numero_normalizado||"—"}</p>
+     <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.55,margin:0}}>{fillScript(resolveScript(scripts,lead.produto||"Atendimento"),lead,operator)}</pre></div>
+     <div className="info">Edite este roteiro em <b>Scripts de ligação</b>. A alteração é compartilhada automaticamente com todos os leads desse produto.</div>
     </div>
    </section>
-  </div>
-  <section className="panel"><PanelTitle title="Tabulação" subtitle="Registre o resultado da ligação para avançar automaticamente."/><div className="resultGrid">{results.map(r=><button key={r} onClick={()=>r==="Retorno"?setShowReturn(true):onResult(r)}>{r}</button>)}</div></section>
-  {showReturn&&<div className="modal" onClick={()=>setShowReturn(false)}><div className="modalBox smallModal" onClick={e=>e.stopPropagation()}><div className="toolbar"><div><div className="eyebrow">RETORNO</div><h2>Agendar retorno</h2><p>{lead?.nome}</p></div><button className="btn" onClick={()=>setShowReturn(false)}>Fechar</button></div><div className="field"><label htmlFor="ak-field-07">Data e hora</label><input id="ak-field-07" type="datetime-local" value={dateTime} min={new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)} onChange={e=>setDateTime(e.target.value)}/></div><div className="field"><label htmlFor="ak-field-08">Observação</label><textarea id="ak-field-08" className="textarea" value={obs} onChange={e=>setObs(e.target.value)} placeholder="Ex.: retornar após 15h, enviar simulação..."/></div><button className="btn primary full big" onClick={()=>{onReturn(dateTime,obs);setShowReturn(false);setObs("")}}>Salvar e próximo lead</button></div></div>}
+  </div>:<section className="panel"><Empty title="Fila vazia" text="Importe uma lista para iniciar a operação."/></section>}
+  {showReturn&&<div className="modal" onClick={()=>setShowReturn(false)}><div className="modalBox smallModal" onClick={e=>e.stopPropagation()}><div className="toolbar"><div><div className="eyebrow">RETORNO</div><h2>Agendar retorno</h2><p>{lead?.nome}</p></div><button className="btn" onClick={()=>setShowReturn(false)}>Fechar</button></div><div className="field"><label htmlFor="ak-field-07">Data e hora</label><input id="ak-field-07" type="datetime-local" value={dateTime} min={new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)} onChange={e=>setDateTime(e.target.value)}/></div><div className="field"><label htmlFor="ak-field-08">Observação</label><textarea id="ak-field-08" className="textarea" value={obs} onChange={e=>setObs(e.target.value)} placeholder="Ex.: retornar após 15h, enviar simulação..."/></div><button className="btn primary full big" onClick={()=>{onReturn(dateTime,obs);setShowReturn(false);setObs("")}}>Salvar retorno e ir para o próximo</button></div></div>}
  </div>;
 }
 function DeskCRM({leads,stages,onMove,onOpen,onChannel,operator}:{leads:Lead[];stages:Stage[];onMove:(id:string,s:string)=>void;onOpen:(l:Lead)=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;operator:any}){
