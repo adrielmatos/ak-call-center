@@ -11,75 +11,57 @@ type ReturnRow={id:string;lead_id:string;operador_id?:string;data_hora:string;ob
 type UserRow={id:string;nome:string;email?:string;perfil:string;ativo:boolean;auth_user_id?:string;permissoes?:Record<string,boolean>;preferencias?:Record<string,any>};
 const APP_VERSION="2.1.0";
 const results=["Interessado","Retorno","Simulação","Proposta","Contrato","Não atendeu","Não interessado","Número inválido","Sem perfil"];
-const DEFAULT_OPERATION_SCRIPTS:Record<string,string>={
- INSS:`ABERTURA
-"Oi, tudo bem? Falo com [NOME]? Aqui é [SEU NOME], da A&K Soluções Financeiras. Posso falar com você por um minutinho?"
+type CallScript={id?:string;chave:string;nome:string;conteudo:string;ativo:boolean;ordem:number};
 
-MOTIVO
-"Eu trabalho com atendimento de crédito para aposentados e pensionistas do INSS. Estou entrando em contato para verificar se existe alguma opção disponível para o seu perfil, como novo crédito, refinanciamento ou portabilidade, quando elegível."
+const SCRIPT_PRODUCTS=[
+ "INSS","Consignado Público","SIAPE","Consignado Privado","CLT","FGTS",
+ "Crédito Pessoal","Cartão Consignado","Cartão Benefício","Seguros","Energia Solar",
+ "Abertura de conta Santander","Crédito com Imóvel em Garantia","Crédito com Veículo em Garantia",
+ "BPC/LOAS","Atendimento"
+];
 
-QUALIFICAÇÃO
-"Você já possui algum consignado hoje ou está procurando uma opção nova? O que seria mais interessante para você: reduzir parcela ou verificar possibilidade de receber um valor?"
-
-FECHAMENTO
-"Se você quiser, posso te enviar a simulação pelo WhatsApp para conferir tudo com calma antes de tomar qualquer decisão."`,
- SIAPE:`ABERTURA
-"Oi, tudo bem? Falo com [NOME]? Aqui é [SEU NOME], da A&K Soluções Financeiras. Prometo ser rápido. Posso te explicar o motivo da ligação?"
-
-MOTIVO
-"Estou entrando em contato para verificar se existe alguma condição de crédito, redução de parcela ou outra opção disponível para o seu perfil. A consulta é uma simulação e não garante aprovação."
-
-QUALIFICAÇÃO
-"Hoje você já possui algum consignado ou cartão consignado? Está procurando reduzir parcela, liberar um valor ou apenas conhecer as condições?"
-
-FECHAMENTO
-"Posso fazer a simulação e te enviar as condições pelo WhatsApp para você analisar com calma?"`,
- FGTS:`ABERTURA
-"Oi, [NOME], tudo bem? Aqui é [SEU NOME], da A&K Soluções Financeiras. Posso falar rapidinho sobre uma possibilidade relacionada ao seu FGTS?"
-
-MOTIVO
-"Quero verificar se existe uma opção disponível para antecipação do saque-aniversário do FGTS, conforme as regras e a análise da instituição."
-
-QUALIFICAÇÃO
-"Você utiliza o saque-aniversário e já fez alguma antecipação anteriormente?"
-
-FECHAMENTO
-"Posso verificar as condições e te enviar valor, taxas e demais informações para você analisar antes de contratar?"`,
- CLT:`ABERTURA
+const DEFAULT_OPERATION_SCRIPTS:Record<string,string>=Object.fromEntries(
+ SCRIPT_PRODUCTS.map(product=>[product,`ABERTURA
 "Oi, [NOME], tudo bem? Aqui é [SEU NOME], da A&K Soluções Financeiras. Posso falar um minutinho?"
 
 MOTIVO
-"Faço atendimento de soluções de crédito para trabalhadores do setor privado. Quero verificar se existe alguma opção disponível para o seu perfil, conforme as regras da modalidade e da instituição."
+"Estou entrando em contato sobre ${product}. Quero verificar, por meio de uma simulação/análise, se existe alguma opção compatível com o seu perfil e com as regras da instituição."
 
 QUALIFICAÇÃO
-"Você está trabalhando atualmente com carteira assinada? Está procurando um valor novo, organizar parcelas ou apenas conhecer as condições?"
+"Você gostaria de conhecer as condições disponíveis e entender valor, parcela, prazo, custos e demais detalhes antes de qualquer contratação?"
 
 FECHAMENTO
-"Se quiser, faço uma simulação e te mostro valor, parcela, prazo e condições antes de qualquer contratação?"`,
- Atendimento:`ABERTURA
-"Oi, [NOME], tudo bem? Aqui é [SEU NOME], da A&K Soluções Financeiras. Posso falar um minutinho?"
+"Se houver uma opção adequada, eu apresento as condições completas para você analisar com calma, sem compromisso."`])
+) as Record<string,string>;
 
-MOTIVO
-"Estou entrando em contato para entender se existe alguma solução financeira que faça sentido para você. Eu faço algumas perguntas rápidas e, se houver uma opção, te explico as condições."
-
-QUALIFICAÇÃO
-"Você está buscando um valor novo, reduzir parcela ou apenas conhecer as possibilidades?"
-
-FECHAMENTO
-"Se fizer sentido, seguimos com a simulação. Se não fizer, sem problema."`
-};
+const normalizeText=(value:string)=>String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
 const normalizeScriptProduct=(value:string)=>{
- const p=String(value||"").toLowerCase();
+ const p=normalizeText(value);
  if(p.includes("inss"))return "INSS";
- if(p.includes("siape"))return "SIAPE";
- if(p.includes("fgts"))return "FGTS";
- if(p.includes("clt")||p.includes("privado"))return "CLT";
- return "Atendimento";
+ if(p.includes("bpc")||p.includes("loas"))return "BPC/LOAS";
+ if(p.includes("siape")||p.includes("consignado federal")||p.includes("federal"))return "SIAPE";
+ if(p.includes("consignado publico"))return "Consignado Público";
+ if(p.includes("consignado privado"))return "Consignado Privado";
+ if(p.includes("credito do trabalhador")||p.includes("trabalhador")||p.includes("clt"))return "CLT";
+ if(p.includes("fgts")||p.includes("saque aniversario"))return "FGTS";
+ if(p.includes("credito pessoal"))return "Crédito Pessoal";
+ if(p.includes("cartao consignado"))return "Cartão Consignado";
+ if(p.includes("cartao beneficio"))return "Cartão Benefício";
+ if(p.includes("seguro"))return "Seguros";
+ if(p.includes("energia solar"))return "Energia Solar";
+ if(p.includes("santander")||p.includes("abertura de conta"))return "Abertura de conta Santander";
+ if(p.includes("imovel em garantia")||p.includes("home equity"))return "Crédito com Imóvel em Garantia";
+ if(p.includes("veiculo em garantia")||p.includes("car equity"))return "Crédito com Veículo em Garantia";
+ return String(value||"").trim()||"Atendimento";
 };
-const resolveScript=(config:any,product:string)=>{
+
+const resolveScript=(scripts:CallScript[],product:string)=>{
  const key=normalizeScriptProduct(product);
- const saved=config?.regras?.scripts||{};
- return String(saved[key]||DEFAULT_OPERATION_SCRIPTS[key]||saved.Atendimento||DEFAULT_OPERATION_SCRIPTS.Atendimento);
+ const direct=scripts.find(s=>s.ativo&&(normalizeText(s.chave)===normalizeText(key)||normalizeText(s.nome)===normalizeText(key)));
+ if(direct)return direct.conteudo;
+ const exact=scripts.find(s=>s.ativo&&(normalizeText(s.chave)===normalizeText(String(product||""))||normalizeText(s.nome)===normalizeText(String(product||""))));
+ if(exact)return exact.conteudo;
+ return DEFAULT_OPERATION_SCRIPTS[key]||DEFAULT_OPERATION_SCRIPTS.Atendimento;
 };
 const mask=(v="")=>v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4");
 const initials=(v="")=>v.split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
@@ -88,6 +70,7 @@ const whatsappHref=(value:any)=>{const d=String(value??"").replace(/\D/g,"");con
 export default function Home(){
  const[session,setSession]=useState<any>(null),[operator,setOperator]=useState<any>(null),[mode,setMode]=useState("dashboard");
  const[leads,setLeads]=useState<Lead[]>([]),[npd,setNpd]=useState<any[]>([]),[stages,setStages]=useState<Stage[]>([]),[campaigns,setCampaigns]=useState<Campaign[]>([]),[returns,setReturns]=useState<ReturnRow[]>([]),[calls,setCalls]=useState<any[]>([]),[users,setUsers]=useState<UserRow[]>([]);
+ const[scripts,setScripts]=useState<CallScript[]>([]);
  const[loading,setLoading]=useState(false),[error,setError]=useState(""),[showImport,setShowImport]=useState(false),[previews,setPreviews]=useState<any[]>([]),[files,setFiles]=useState<File[]>([]),[msg,setMsg]=useState("");
  const[search,setSearch]=useState(""),[page,setPage]=useState(1),[selectedLead,setSelectedLead]=useState<Lead|null>(null),[authReady,setAuthReady]=useState(false),[recovery,setRecovery]=useState(false),[channelConfig,setChannelConfig]=useState<any>(null),[dialerConfig,setDialerConfig]=useState<any>(null),[skippedLeadId,setSkippedLeadId]=useState<string|null>(null);
  const pageSize=50;
@@ -118,6 +101,7 @@ export default function Home(){
   return()=>{alive=false;data.subscription.unsubscribe()};
  },[]);
  useEffect(()=>{if(session)loadOperator()},[session]);
+ useEffect(()=>{if(session)loadScripts()},[session,mode]);
  useEffect(()=>setPage(1),[search]);
  useEffect(()=>{if(session)load(mode)},[mode]);
  useEffect(()=>{
@@ -190,6 +174,15 @@ export default function Home(){
     const{data:all,error:ue}=await supabase.from("operadores").select("*").order("created_at",{ascending:true});
     if(ue)setError(ue.message);else setUsers((all||[]) as UserRow[]);
   }else setUsers([data as UserRow]);
+}
+async function loadScripts(){
+  if(!supabase)return;
+  const{data,error}=await supabase.from("scripts_ligacao").select("id,chave,nome,conteudo,ativo,ordem").order("ordem",{ascending:true}).order("nome",{ascending:true});
+  if(error){
+    setScripts(SCRIPT_PRODUCTS.map((nome,ordem)=>({chave:nome,nome,conteudo:DEFAULT_OPERATION_SCRIPTS[nome]||DEFAULT_OPERATION_SCRIPTS.Atendimento,ativo:true,ordem})));
+    return;
+  }
+  setScripts(((data||[]) as CallScript[]).filter(s=>s.ativo||operator?.perfil==="admin"));
 }
 async function audit(acao:string,entidade?:string,entidade_id?:string,detalhes?:any){
   if(!supabase||!operator?.id)return;
@@ -356,6 +349,15 @@ async function sendChannel(channel:"whatsapp"|"sms",lead:Lead){
   }catch(e:any){setError(e?.message||"Não foi possível enviar pelo canal configurado.");}
 }
 
+async function saveCallScript(data:{id?:string;chave:string;nome:string;conteudo:string;ativo:boolean;ordem?:number}){
+  if(!supabase||operator?.perfil!=="admin")return;
+  const payload={id:data.id||undefined,chave:normalizeScriptProduct(data.chave||data.nome),nome:data.nome.trim(),conteudo:data.conteudo,ativo:data.ativo,ordem:data.ordem??scripts.length,created_by:operator.id,updated_at:new Date().toISOString()};
+  const{data:row,error:e}=await supabase.from("scripts_ligacao").upsert(payload,{onConflict:"chave"}).select("id,chave,nome,conteudo,ativo,ordem").single();
+  if(e){setError("Não foi possível salvar o script: "+e.message);return}
+  setScripts(prev=>[...prev.filter(s=>s.chave!==row.chave),row].sort((a,b)=>a.ordem-b.ordem||a.nome.localeCompare(b.nome)));
+  await audit("script_ligacao_salvo","scripts_ligacao",row.id,{chave:row.chave,nome:row.nome});
+  setMsg("Script de "+row.nome+" salvo e sincronizado com o Discador.");
+}
 async function saveChannels(data:any){if(operator)await saveChannelsFor(operator.id,data)}
 async function saveDialerFor(targetId:string,data:any){
   if(!supabase||!operator)return;
@@ -370,7 +372,7 @@ async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,
  if(!session||recovery)return <AuthScreen recovery={recovery} onAuth={auth} reset={resetPassword} updatePassword={updatePassword} msg={msg} error={error}/>;
 
  const allNav=[
-  ["dashboard","Visão geral","⌂"],["discador","Discador","☎"],["crm","CRM","◆"],["resultados","Resultados","↳"],["leads","Leads","◉"],["campanhas","Campanhas","▣"],["retornos","Retornos","◷"],["telefonia","Telefonia","◌"],["mensagens","Omnichannel","✉"],["relatorios","Relatórios","▥"],["npd","Não Perturbe","⊘"],["config","Configurações","⚙"]
+  ["dashboard","Visão geral","⌂"],["discador","Discador","☎"],["crm","CRM","◆"],["resultados","Resultados","↳"],["leads","Leads","◉"],["campanhas","Campanhas","▣"],["retornos","Retornos","◷"],["telefonia","Telefonia","◌"],["mensagens","Omnichannel","✉"],["relatorios","Relatórios","▥"],["npd","Não Perturbe","⊘"],["scripts","Scripts de ligação","✎"],["config","Configurações","⚙"]
  ] as const;
  const nav=allNav.filter(x=>operator?.perfil==="admin"||operator?.permissoes?.[x[0]]!==false);
  return <div className="app">
@@ -387,7 +389,7 @@ async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,
    {error&&<div className="alert error"><b>Erro:</b> {error}<button onClick={()=>setError("")}>×</button></div>}
    {msg&&<div className="alert success">{msg}<button onClick={()=>setMsg("")}>×</button></div>}
    {mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length} campaigns={campaigns.length} returns={returns} calls={calls} loading={loading} dialerConfig={dialerConfig} onSaveDialer={saveDialer}/>}
-   {mode==="discador"&&<Dialer lead={current} available={available.length} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>{setSkippedLeadId(null);callResult(r)}} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} onNextLead={()=>{if(current){setSkippedLeadId(current.id);setMsg("Próximo lead selecionado.")}}} dialerConfig={dialerConfig}/>}
+   {mode==="discador"&&<Dialer lead={current} available={available.length} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>{setSkippedLeadId(null);callResult(r)}} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} onNextLead={()=>{if(current){setSkippedLeadId(current.id);setMsg("Próximo lead selecionado.")}}} scripts={scripts}/>}
    {mode==="crm"&&<DeskCRM leads={leads} stages={stages} onMove={moveLead} onOpen={setSelectedLead} onChannel={sendChannel} operator={operator}/>}   {mode==="resultados"&&<OperationalResults leads={leads} onOpen={setSelectedLead}/>}
    {mode==="leads"&&<Leads leads={paged} loading={loading} search={search} setSearch={setSearch} page={page} setPage={setPage} total={filtered.length} pageSize={pageSize} onOpen={setSelectedLead}/>}
    {mode==="campanhas"&&<Campaigns rows={campaigns} onCreate={createCampaign} onToggle={toggleCampaign} onDelete={deleteCampaign}/>}
@@ -396,6 +398,7 @@ async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,
    {mode==="mensagens"&&<Omnichannel config={channelConfig} onSave={saveChannels}/>}
    {mode==="relatorios"&&<Reports leads={leads} npd={npd} calls={calls} returns={returns}/>}
    {mode==="npd"&&<Npd rows={npd} onRemove={removeNpd}/>}
+   {mode==="scripts"&&<ScriptManager scripts={scripts} onSave={saveCallScript} canEdit={operator?.perfil==="admin"}/>}
    {mode==="config"&&<Settings operator={operator} users={users} onSaveUser={saveUserConfig} channelConfig={channelConfig} onSaveChannels={saveChannelsFor} dialerConfig={dialerConfig} onSaveDialer={saveDialerFor}/>}
    {selectedLead&&<LeadDrawer lead={selectedLead} onClose={()=>setSelectedLead(null)} onMove={moveLead} stages={stages} onChannel={sendChannel}/>}
    {showImport&&<ImportModal files={files} previews={previews} onFiles={async selected=>{setError("");setFiles(selected);try{setPreviews(await Promise.all(selected.map(f=>parseFile(f))))}catch{setPreviews([]);setError("Não foi possível ler uma das planilhas. Verifique se os arquivos estão íntegros.")}}} onClose={()=>{setShowImport(false);setPreviews([]);setFiles([]);setMsg("")}} onImport={doImport} loading={loading}/>}
@@ -453,29 +456,35 @@ function Dashboard({leads,available,npd,campaigns,returns,calls,loading,dialerCo
   {loading&&<div className="loadingbar"/>}
  </div>;
 }
-function ScriptEditor({config,onSave}:{config:any;onSave:(d:any)=>void}){
- const[open,setOpen]=useState(false),[product,setProduct]=useState("INSS"),[text,setText]=useState(""),[saved,setSaved]=useState(false);
- useEffect(()=>{if(open){setText(resolveScript(config,product));setSaved(false)}},[open,product,config]);
- const save=()=>{
-  const scripts={...(config?.regras?.scripts||{}),[product]:text};
-  onSave({...config,regras:{...(config?.regras||{}),scripts}});
-  setSaved(true);
- };
- return <section className="panel">
-  <div className="toolbar"><PanelTitle title="Script de ligação" subtitle="Edite o que o operador deve falar. O mesmo script salvo aqui aparece automaticamente no Discador conforme o produto do lead."/><button className="btn primary" onClick={()=>setOpen(true)}>✎ Editar script</button></div>
-  {open&&<div className="modal" onClick={()=>setOpen(false)}><div className="modalBox" onClick={e=>e.stopPropagation()}>
-   <div className="toolbar"><div><div className="eyebrow">OPERAÇÃO 360 • SCRIPT</div><h2>Editar script do operador</h2><p>As alterações ficam salvas na configuração da operação e sincronizadas com o Discador.</p></div><button className="btn" onClick={()=>setOpen(false)}>Fechar</button></div>
-   <div className="field"><label htmlFor="ak-script-product">Produto</label><select id="ak-script-product" value={product} onChange={e=>setProduct(e.target.value)}><option>INSS</option><option>SIAPE</option><option>FGTS</option><option>CLT</option><option>Atendimento</option></select></div>
-   <div className="field"><label htmlFor="ak-script-editor">Texto falado pelo operador</label><textarea id="ak-script-editor" className="textarea" style={{minHeight:420}} value={text} onChange={e=>setText(e.target.value)} placeholder={"Use [NOME] para preencher automaticamente o nome do cliente."}/></div>
-   <div className="info">Use <b>[NOME]</b> para o nome automático do cliente e <b>[SEU NOME]</b> para o operador.</div>
-   <div className="actionRow"><button className="btn primary" onClick={save}>Salvar script</button>{saved&&<span className="pill">Salvo e sincronizado</span>}</div>
-  </div></div>}
- </section>;
+function ScriptManager({scripts,onSave,canEdit}:{scripts:CallScript[];onSave:(data:{id?:string;chave:string;nome:string;conteudo:string;ativo:boolean;ordem?:number})=>void;canEdit:boolean}){
+ const[selectedKey,setSelectedKey]=useState("INSS"),[creating,setCreating]=useState(false),[nome,setNome]=useState(""),[text,setText]=useState(""),[ativo,setAtivo]=useState(true),[saved,setSaved]=useState(false);
+ const ordered=useMemo(()=>[...scripts].sort((a,b)=>a.ordem-b.ordem||a.nome.localeCompare(b.nome)),[scripts]);
+ useEffect(()=>{
+  const current=ordered.find(s=>s.chave===selectedKey)||ordered[0];
+  if(current&&!creating){setSelectedKey(current.chave);setNome(current.nome);setText(current.conteudo);setAtivo(current.ativo);setSaved(false)}
+ },[ordered,selectedKey,creating]);
+ const startNew=()=>{setCreating(true);setSelectedKey("");setNome("");setText(DEFAULT_OPERATION_SCRIPTS.Atendimento);setAtivo(true);setSaved(false)};
+ const edit=(key:string)=>{setCreating(false);setSelectedKey(key);const current=ordered.find(s=>s.chave===key);if(current){setNome(current.nome);setText(current.conteudo);setAtivo(current.ativo)}};
+ const save=()=>{if(!nome.trim()||!text.trim())return;const current=ordered.find(s=>s.chave===selectedKey);onSave({id:current?.id,chave:normalizeScriptProduct(nome),nome:nome.trim(),conteudo:text,ativo,ordem:current?.ordem??ordered.length});setSaved(true);setCreating(false);setSelectedKey(normalizeScriptProduct(nome))};
+ return <div className="stack">
+  <div className="panel">
+   <div className="toolbar"><PanelTitle title="Scripts de ligação" subtitle="Cadastre e edite os roteiros da operação. O script fica centralizado e aparece automaticamente no Discador conforme o produto do lead."/><div className="actionRow"><span className="pill">{ordered.length} scripts</span>{canEdit&&<button className="btn primary" onClick={startNew}>＋ Novo script</button>}</div></div>
+   <div className="campaignGrid">{ordered.map(s=><button key={s.id||s.chave} className="campaignCard" onClick={()=>canEdit&&edit(s.chave)} style={{textAlign:"left",cursor:canEdit?"pointer":"default"}}><div className="campaignIcon">✎</div><div className="campaignMain"><b>{s.nome}</b><small>{s.ativo?"Ativo":"Inativo"} • automático por produto</small></div></button>)}</div>
+  </div>
+  <div className="panel">
+   <div className="toolbar"><PanelTitle title={creating?"Novo script":"Editar script"} subtitle="Uma única edição vale para todos os leads que usam esse produto."/><span className="pill">{creating?"Novo":"Sincronizado"}</span></div>
+   {!canEdit?<div className="info">Somente o proprietário pode criar ou alterar os scripts. O operador recebe automaticamente o roteiro correspondente ao produto.</div>:
+   <><div className="twoFields"><div className="field"><label htmlFor="ak-script-product">Produto / serviço</label><input id="ak-script-product" value={nome} onChange={e=>setNome(e.target.value)} placeholder="Ex.: INSS, FGTS, Crédito Pessoal..."/></div><div className="field"><label htmlFor="ak-script-active">Status</label><select id="ak-script-active" value={ativo?"ativo":"inativo"} onChange={e=>setAtivo(e.target.value==="ativo")}><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></div></div>
+   <div className="field"><label htmlFor="ak-script-editor">Texto falado pelo operador</label><textarea id="ak-script-editor" className="textarea" style={{minHeight:420}} value={text} onChange={e=>setText(e.target.value)} placeholder="Use [NOME], [BANCO], [PRODUTO], [VALOR] e [OPERADOR] quando quiser deixar campos dinâmicos."/></div>
+   <div className="info">Tags disponíveis: <b>[NOME]</b>, <b>[SEU NOME]</b>, <b>[BANCO]</b>, <b>[PRODUTO]</b>, <b>[VALOR]</b> e <b>[OPERADOR]</b>. O nome do cliente é preenchido automaticamente no Discador.</div>
+   <div className="actionRow"><button className="btn primary" disabled={!nome.trim()||!text.trim()} onClick={save}>Salvar script</button>{saved&&<span className="pill">Salvo e sincronizado</span>}</div></>}
+  </div>
+ </div>;
 }
 function Metric({title,value,icon,hint}:{title:string;value:number;icon:string;hint:string}){return <div className="panel metric"><div className="metricIcon">{icon}</div><div><span>{title}</span><strong>{value}</strong><small>{hint}</small></div></div>}
 function PanelTitle({title,subtitle}:{title:string;subtitle:string}){return <div className="panelTitle"><div><h3>{title}</h3><p>{subtitle}</p></div></div>}
 
-function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,onNextLead,dialerConfig}:{lead?:Lead;available:number;onCall:()=>void;onResult:(r:string)=>void;onReturn:(dateTime:string,observacao:string)=>void;onBlock:()=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;onNextLead:()=>void;dialerConfig?:any}){
+function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,onNextLead,scripts}:{lead?:Lead;available:number;onCall:()=>void;onResult:(r:string)=>void;onReturn:(dateTime:string,observacao:string)=>void;onBlock:()=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;onNextLead:()=>void;scripts:CallScript[]}){
  const[showReturn,setShowReturn]=useState(false),[paused,setPaused]=useState(false),[calling,setCalling]=useState(false),[dateTime,setDateTime]=useState(()=>{const d=new Date(Date.now()+86400000);d.setHours(9,0,0,0);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}),[obs,setObs]=useState("");
  useEffect(()=>{if(paused||!lead)return;const t=window.setTimeout(()=>{setCalling(true);onCall()},1200);return()=>window.clearTimeout(t)},[paused,lead?.id]);
  return <div className="stack">
@@ -497,14 +506,14 @@ function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,onNex
     </>:<Empty title="Fila vazia" text="Importe uma lista para iniciar a operação."/>}
    </section>
    <section className="panel">
-    <PanelTitle title="Script do discador" subtitle="Script sincronizado com o script salvo no Dashboard."/>
+    <PanelTitle title="Script do discador" subtitle="Script sincronizado com Scripts de ligação."/>
     <div className="scriptCard">
      <div className="eyebrow">{lead?.produto||"CONSIGNADO"}</div>
      <p>Cliente: <b>{lead?.nome||"—"}</b></p>
      <p>{lead?.telefones?.[0]?.numero_normalizado||"—"}</p>
-     <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.6,margin:0}}>{resolveScript(dialerConfig,lead?.produto||"Atendimento").replaceAll("[NOME]",lead?.nome||"cliente")}</pre></div>
+     <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.6,margin:0}}>{resolveScript(scripts,lead?.produto||"Atendimento").replaceAll("[NOME]",lead?.nome||"cliente").replaceAll("[OPERADOR]",operator?.nome||"operador")}</pre></div>
      <div className="callActions"><button className="btn primary" onClick={()=>lead&&onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO VIA WHATSAPP</button></div>
-     <div className="info">Edite este roteiro no Dashboard → Script de ligação. O operador sempre recebe o texto salvo para o produto do lead.</div>
+     <div className="info">Edite este roteiro em Scripts de ligação. A alteração é compartilhada automaticamente com todos os leads desse produto.</div>
     </div>
    </section>
   </div>
@@ -609,7 +618,7 @@ function Npd({rows,onRemove}:{rows:any[];onRemove:(r:any)=>void}){
  return <div className="stack"><div className="panel"><div className="toolbar"><PanelTitle title="Não Perturbe" subtitle="Selecione um ou vários leads para remover o bloqueio e devolver à fila."/><div className="actionRow"><span className="pill">{selected.length} selecionado(s)</span><button className="btn dangerText" disabled={!selected.length} onClick={removeSelected}>Remover selecionados</button></div></div><div className="tableWrap"><table><thead><tr><th><input id="ak-field-46" type="checkbox" checked={all} onChange={e=>setSelected(e.target.checked?rows.map(r=>r.id):[])}/></th><th>Nome</th><th>CPF</th><th>Telefone</th><th>Origem</th><th>Motivo</th><th>Ação</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td><input id="ak-field-47" type="checkbox" checked={selected.includes(r.id)} onChange={()=>toggle(r.id)}/></td><td><button className="linkBtn" onClick={()=>toggle(r.id)}><b>{r.nome||"—"}</b></button></td><td>{r.cpf?mask(r.cpf):"—"}</td><td>{r.telefone||"—"}</td><td>{r.origem}</td><td>{r.motivo||"—"}</td><td><button className="tableBtn dangerText" onClick={()=>onRemove(r)}>Remover</button></td></tr>)}</tbody></table>{!rows.length&&<Empty title="Nenhum bloqueio ativo" text="Use o botão Não ligar mais na fila."/>}</div></div></div>
 }
 function Settings({operator,users,onSaveUser,channelConfig,onSaveChannels,dialerConfig,onSaveDialer}:{operator:any;users:UserRow[];onSaveUser:(id:string,p:Record<string,boolean>,pref:Record<string,any>,ativo:boolean,perfil:string)=>void;channelConfig:any;onSaveChannels:(id:string,d:any)=>void;dialerConfig:any;onSaveDialer:(id:string,d:any)=>void}){
- const isAdmin=operator?.perfil==="admin";const moduleList=[["dashboard","Visão geral"],["discador","Discador"],["crm","CRM"],["resultados","Resultados"],["leads","Leads"],["campanhas","Campanhas"],["retornos","Retornos"],["telefonia","Telefonia"],["mensagens","Omnichannel"],["relatorios","Relatórios"],["npd","Não Perturbe"],["config","Configurações"]];
+ const isAdmin=operator?.perfil==="admin";const moduleList=[["dashboard","Visão geral"],["discador","Discador"],["crm","CRM"],["resultados","Resultados"],["leads","Leads"],["campanhas","Campanhas"],["retornos","Retornos"],["telefonia","Telefonia"],["mensagens","Omnichannel"],["relatorios","Relatórios"],["npd","Não Perturbe"],["scripts","Scripts de ligação"],["config","Configurações"]];
  const[sel,setSel]=useState<UserRow>(operator||users[0]),[selChannels,setSelChannels]=useState<any>(channelConfig),[selDialer,setSelDialer]=useState<any>(dialerConfig);
  const[perm,setPerm]=useState<Record<string,boolean>>(sel?.permissoes||{}),[ativo,setAtivo]=useState(sel?.ativo??true),[perfil,setPerfil]=useState(sel?.perfil||"operador");
  useEffect(()=>{if(!sel&&operator)setSel(operator);else if(!sel&&users[0])setSel(users[0])},[operator,users,sel]);
