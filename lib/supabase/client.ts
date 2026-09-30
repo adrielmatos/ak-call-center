@@ -43,19 +43,6 @@ function getPublicConfig(): PublicConfig {
   const url = envUrl || FALLBACK_PUBLIC_CONFIG.url;
   const key = envPublishableKey || envAnonKey || FALLBACK_PUBLIC_CONFIG.key;
 
-  if (typeof window !== "undefined") {
-    // Diagnostic logging deliberately reports only presence/source metadata.
-    // Never log the URL value, API key, JWT, service_role key, or secret key.
-    console.info("[Supabase] browser bundle configuration", {
-      urlFromEnv: Boolean(envUrl),
-      publishableKeyFromEnv: Boolean(envPublishableKey),
-      anonKeyFromEnv: Boolean(envAnonKey),
-      usingFallbackUrl: !envUrl,
-      usingFallbackKey: !envPublishableKey && !envAnonKey,
-      resolved: Boolean(url && key),
-    });
-  }
-
   return { url, key };
 }
 
