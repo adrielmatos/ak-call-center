@@ -170,7 +170,7 @@ async function callResult(result:string){
   if(!current)return;
   const t=current.telefones?.[0],now=new Date().toISOString();
   try{
-    const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"finish",lead_id:current.id,telefone_id:t?.id,resultado:result,inicio:now,fim:now})});
+    const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"finish",lead_id:current.id,telefone_id:t?.id,resultado:result,tabulacao:{resultado:result},inicio:now,fim:now})});
     const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível registrar a ligação.");
     const statusMap:Record<string,string>={"Número inválido":"numero_invalido","Sem perfil":"sem_perfil","Não interessado":"nao_interessado","Não atendeu":"nao_atendeu","Interessado":"interessado","Simulação":"simulação","Proposta":"proposta","Contrato":"contrato"};
     const status=statusMap[result]||"finalizado";
@@ -184,7 +184,7 @@ async function scheduleReturn(dateTime:string,observacao:string){
   const t=current.telefones?.[0],now=new Date().toISOString(),when=new Date(dateTime).toISOString();
   if(new Date(when).getTime()<=Date.now()){setError("Escolha uma data e hora futura para o retorno.");return}
   try{
-    const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"finish",lead_id:current.id,telefone_id:t?.id,resultado:"Retorno",observacao:observacao||"",inicio:now,fim:now})});
+    const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"finish",lead_id:current.id,telefone_id:t?.id,resultado:"Retorno",tabulacao:{resultado:"Retorno",agendamento:when,observacao:observacao||""},observacao:observacao||"",inicio:now,fim:now})});
     const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível registrar a ligação.");
     const{error:e}=await supabase!.from("retornos").insert({lead_id:current.id,operador_id:operator?.id,data_hora:when,observacao:observacao||null,concluido:false});if(e)throw e;
     const{error:ue}=await supabase!.from("leads").update({status:"retorno",agendamento_retorno:when,updated_at:now,tentativas_contato:Number(current.tentativas_contato||0)+1}).eq("id",current.id);if(ue)throw ue;
