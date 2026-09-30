@@ -90,7 +90,7 @@ export default function Home(){
  const[leads,setLeads]=useState<Lead[]>([]),[npd,setNpd]=useState<any[]>([]),[stages,setStages]=useState<Stage[]>([]),[campaigns,setCampaigns]=useState<Campaign[]>([]),[returns,setReturns]=useState<ReturnRow[]>([]),[calls,setCalls]=useState<any[]>([]),[users,setUsers]=useState<UserRow[]>([]);
  const[scripts,setScripts]=useState<CallScript[]>([]);
  const[loading,setLoading]=useState(false),[error,setError]=useState(""),[showImport,setShowImport]=useState(false),[previews,setPreviews]=useState<any[]>([]),[files,setFiles]=useState<File[]>([]),[msg,setMsg]=useState("");
- const[search,setSearch]=useState(""),[page,setPage]=useState(1),[selectedLead,setSelectedLead]=useState<Lead|null>(null),[authReady,setAuthReady]=useState(false),[recovery,setRecovery]=useState(false),[channelConfig,setChannelConfig]=useState<any>(null),[dialerConfig,setDialerConfig]=useState<any>(null),[skippedLeadId,setSkippedLeadId]=useState<string|null>(null);
+ const[search,setSearch]=useState(""),[page,setPage]=useState(1),[selectedLead,setSelectedLead]=useState<Lead|null>(null),[authReady,setAuthReady]=useState(false),[recovery,setRecovery]=useState(false),[channelConfig,setChannelConfig]=useState<any>(null),[dialerConfig,setDialerConfig]=useState<any>(null);
  const pageSize=50;
  const[debouncedSearch,setDebouncedSearch]=useState("");
  useEffect(()=>{const t=setTimeout(()=>setDebouncedSearch(search),250);return()=>clearTimeout(t)},[search]);
@@ -102,9 +102,9 @@ export default function Home(){
   return leads.filter(l=>{
     const cpfKey=String(l.cpf||"").replace(/\D/g,"");
     const phones=(l.telefones||[]).map(t=>String(t.numero_normalizado||"").replace(/\D/g,""));
-    return l.id!==skippedLeadId&&l.status==="disponivel"&&!l.bloqueado&&!l.opt_out&&l.telefones?.length&&!blockedCpf.has(cpfKey)&&!phones.some(n=>blockedPhones.has(n));
+    return l.status==="disponivel"&&!l.bloqueado&&!l.opt_out&&l.telefones?.length&&!blockedCpf.has(cpfKey)&&!phones.some(n=>blockedPhones.has(n));
   }).sort((a,b)=>Number(b.margem_disponivel||0)-Number(a.margem_disponivel||0)||Number(b.prioridade||0)-Number(a.prioridade||0)||Number(a.tentativas_contato||0)-Number(b.tentativas_contato||0)||String(a.created_at||"").localeCompare(String(b.created_at||"")));
- },[leads,npd,skippedLeadId]);
+ },[leads,npd]);
  const current=available[0];
 
  useEffect(()=>{
