@@ -51,10 +51,16 @@ export async function POST(request:Request){
   const {data:operator,error:oe}=await supabase.from("operadores").select("id,ativo").eq("auth_user_id",user.id).maybeSingle();
   if(oe||!operator?.ativo)return NextResponse.json({error:{code:"operator_not_allowed",message:"Operador ativo não encontrado."}},{status:403,headers:{"x-request-id":requestId}});
 
-  const {data:lead,error:le}=await supabase.from("leads").select("id,bloqueado,opt_out").eq("id",input.lead_id).maybeSingle();
+  const {data:lead,error:le}=await supabase.from("leads").select("id,cpf,telefone,bloqueado,opt_out").eq("id",input.lead_id).maybeSingle();
   if(le)return NextResponse.json({error:{code:"lead_lookup_failed",message:le.message}},{status:400,headers:{"x-request-id":requestId}});
   if(!lead)return NextResponse.json({error:{code:"lead_not_found",message:"Lead não encontrado."}},{status:404,headers:{"x-request-id":requestId}});
   if(lead.bloqueado||lead.opt_out)return NextResponse.json({error:{code:"lead_blocked",message:"Lead bloqueado para contato."}},{status:409,headers:{"x-request-id":requestId}});
+  const cpfKey=String(lead.cpf||"").replace(/\D/g,"");
+  const phoneKey=String(lead.telefone||"").replace(/\D/g,"");
+  const {data:npdRows}=await supabase.from("lista_nao_perturbe").select("id,cpf,telefone").eq("ativo",true).or(`cpf.eq.${cpfKey},telefone.eq.${phoneKey}`).limit(5);
+  if((npdRows||[]).some((row:any)=>String(row.cpf||"").replace(/\D/g,"")===cpfKey&&cpfKey || String(row.telefone||"").replace(/\D/g,"")===phoneKey&&phoneKey)){
+    return NextResponse.json({error:{code:"lead_npd_blocked",message:"Número/CPF consta na lista Não Perturbe."}},{status:409,headers:{"x-request-id":requestId}});
+  }
 
   let call:any=null;
   if(input.action==="start"){
