@@ -15,13 +15,14 @@ type AuthSubscription = ReturnType<
 let browserClient: SupabaseClient | null = null;
 
 function getPublicConfig(): PublicConfig {
-  const url = String(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  ).trim();
+  // NEXT_PUBLIC_* values are embedded by Next.js at build time.
+  // Keep both Supabase public key names for compatibility with existing
+  // Vercel projects created with the older ANON_KEY convention.
+  const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
 
   const key = String(
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
       "",
   ).trim();
 
@@ -38,8 +39,17 @@ function assertBrowser(): void {
 
 function assertConfig(config: PublicConfig): void {
   if (!config.url || !config.key) {
+    const missing = [
+      !config.url ? "NEXT_PUBLIC_SUPABASE_URL" : null,
+      !config.key
+        ? "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ou NEXT_PUBLIC_SUPABASE_ANON_KEY"
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" e ");
+
     throw new Error(
-      "Supabase não está configurado. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY no ambiente da aplicação.",
+      `Supabase não está configurado no bundle de produção. Variável(is) ausente(s): ${missing}. As variáveis NEXT_PUBLIC_* precisam existir no ambiente usado pelo deployment antes do build.`,
     );
   }
 }
@@ -49,13 +59,6 @@ export function isSupabaseConfigured(): boolean {
   return Boolean(config.url && config.key);
 }
 
-/**
- * Compatibilidade com versões anteriores.
- *
- * A configuração pública agora é obtida exclusivamente das variáveis
- * NEXT_PUBLIC_* incorporadas ao bundle. Não há mais chamada a /api/config
- * durante a inicialização do cliente.
- */
 export async function ensureSupabaseConfig(): Promise<PublicConfig> {
   assertBrowser();
 
@@ -84,12 +87,6 @@ export async function ensureClient(): Promise<SupabaseClient> {
   return createClient();
 }
 
-/**
- * Compatibility proxy for existing components.
- *
- * The proxy does not create a fake client during SSR/prerender. Any browser
- * access creates the single shared browser client above.
- */
 const authProxy = new Proxy({} as SupabaseClient["auth"], {
   get(_target, property) {
     if (property === "getSession") {
@@ -140,10 +137,7 @@ const authProxy = new Proxy({} as SupabaseClient["auth"], {
       return undefined;
     }
 
-    const value = Reflect.get(
-      client.auth as object,
-      property,
-    );
+    const value = Reflect.get(client.auth as object, property);
 
     return typeof value === "function"
       ? value.bind(client.auth)
@@ -158,11 +152,7 @@ export const supabase = new Proxy({} as SupabaseClient, {
     }
 
     const client = createClient();
-    const value = Reflect.get(
-      client as object,
-      property,
-      receiver,
-    );
+    const value = Reflect.get(client as object, property, receiver);
 
     return typeof value === "function"
       ? value.bind(client)
