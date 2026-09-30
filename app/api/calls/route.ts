@@ -57,8 +57,16 @@ export async function POST(request:Request){
   if(lead.bloqueado||lead.opt_out)return NextResponse.json({error:{code:"lead_blocked",message:"Lead bloqueado para contato."}},{status:409,headers:{"x-request-id":requestId}});
   const cpfKey=String(lead.cpf||"").replace(/\D/g,"");
   const phoneKey=String(lead.telefone||"").replace(/\D/g,"");
-  const {data:npdRows}=await supabase.from("lista_nao_perturbe").select("id,cpf,telefone").eq("ativo",true).or(`cpf.eq.${cpfKey},telefone.eq.${phoneKey}`).limit(5);
-  if((npdRows||[]).some((row:any)=>String(row.cpf||"").replace(/\D/g,"")===cpfKey&&cpfKey || String(row.telefone||"").replace(/\D/g,"")===phoneKey&&phoneKey)){
+  const npdMatches:any[]=[];
+  if(cpfKey){
+    const {data:rows}=await supabase.from("lista_nao_perturbe").select("id,cpf,telefone").eq("ativo",true).eq("cpf",cpfKey).limit(5);
+    npdMatches.push(...(rows||[]));
+  }
+  if(phoneKey){
+    const {data:rows}=await supabase.from("lista_nao_perturbe").select("id,cpf,telefone").eq("ativo",true).eq("telefone",phoneKey).limit(5);
+    npdMatches.push(...(rows||[]));
+  }
+  if(npdMatches.length){
     return NextResponse.json({error:{code:"lead_npd_blocked",message:"Número/CPF consta na lista Não Perturbe."}},{status:409,headers:{"x-request-id":requestId}});
   }
 
