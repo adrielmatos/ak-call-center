@@ -2,7 +2,6 @@
 import {useEffect,useMemo,useState} from "react";
 import {supabase} from "@/lib/supabase";
 import {parseFile,phone,cpf} from "@/lib/importer";
-import DialerScript from "@/app/components/dialer-script";
 import SipSoftphone from "@/app/components/sip-softphone";
 
 type Lead={id:string;nome:string;cpf?:string;cidade?:string;uf?:string;produto?:string;status:string;prioridade:number;margem_disponivel?:number;tentativas_contato?:number;bloqueado:boolean;opt_out:boolean;telefones?:{id:string;numero_normalizado:string}[];created_at?:string};
@@ -12,6 +11,76 @@ type ReturnRow={id:string;lead_id:string;operador_id?:string;data_hora:string;ob
 type UserRow={id:string;nome:string;email?:string;perfil:string;ativo:boolean;auth_user_id?:string;permissoes?:Record<string,boolean>;preferencias?:Record<string,any>};
 const APP_VERSION="2.1.0";
 const results=["Interessado","Retorno","Simulação","Proposta","Contrato","Não atendeu","Não interessado","Número inválido","Sem perfil"];
+const DEFAULT_OPERATION_SCRIPTS:Record<string,string>={
+ INSS:`ABERTURA
+"Oi, tudo bem? Falo com [NOME]? Aqui é [SEU NOME], da A&K Soluções Financeiras. Posso falar com você por um minutinho?"
+
+MOTIVO
+"Eu trabalho com atendimento de crédito para aposentados e pensionistas do INSS. Estou entrando em contato para verificar se existe alguma opção disponível para o seu perfil, como novo crédito, refinanciamento ou portabilidade, quando elegível."
+
+QUALIFICAÇÃO
+"Você já possui algum consignado hoje ou está procurando uma opção nova? O que seria mais interessante para você: reduzir parcela ou verificar possibilidade de receber um valor?"
+
+FECHAMENTO
+"Se você quiser, posso te enviar a simulação pelo WhatsApp para conferir tudo com calma antes de tomar qualquer decisão."`,
+ SIAPE:`ABERTURA
+"Oi, tudo bem? Falo com [NOME]? Aqui é [SEU NOME], da A&K Soluções Financeiras. Prometo ser rápido. Posso te explicar o motivo da ligação?"
+
+MOTIVO
+"Estou entrando em contato para verificar se existe alguma condição de crédito, redução de parcela ou outra opção disponível para o seu perfil. A consulta é uma simulação e não garante aprovação."
+
+QUALIFICAÇÃO
+"Hoje você já possui algum consignado ou cartão consignado? Está procurando reduzir parcela, liberar um valor ou apenas conhecer as condições?"
+
+FECHAMENTO
+"Posso fazer a simulação e te enviar as condições pelo WhatsApp para você analisar com calma?"`,
+ FGTS:`ABERTURA
+"Oi, [NOME], tudo bem? Aqui é [SEU NOME], da A&K Soluções Financeiras. Posso falar rapidinho sobre uma possibilidade relacionada ao seu FGTS?"
+
+MOTIVO
+"Quero verificar se existe uma opção disponível para antecipação do saque-aniversário do FGTS, conforme as regras e a análise da instituição."
+
+QUALIFICAÇÃO
+"Você utiliza o saque-aniversário e já fez alguma antecipação anteriormente?"
+
+FECHAMENTO
+"Posso verificar as condições e te enviar valor, taxas e demais informações para você analisar antes de contratar?"`,
+ CLT:`ABERTURA
+"Oi, [NOME], tudo bem? Aqui é [SEU NOME], da A&K Soluções Financeiras. Posso falar um minutinho?"
+
+MOTIVO
+"Faço atendimento de soluções de crédito para trabalhadores do setor privado. Quero verificar se existe alguma opção disponível para o seu perfil, conforme as regras da modalidade e da instituição."
+
+QUALIFICAÇÃO
+"Você está trabalhando atualmente com carteira assinada? Está procurando um valor novo, organizar parcelas ou apenas conhecer as condições?"
+
+FECHAMENTO
+"Se quiser, faço uma simulação e te mostro valor, parcela, prazo e condições antes de qualquer contratação?"`,
+ Atendimento:`ABERTURA
+"Oi, [NOME], tudo bem? Aqui é [SEU NOME], da A&K Soluções Financeiras. Posso falar um minutinho?"
+
+MOTIVO
+"Estou entrando em contato para entender se existe alguma solução financeira que faça sentido para você. Eu faço algumas perguntas rápidas e, se houver uma opção, te explico as condições."
+
+QUALIFICAÇÃO
+"Você está buscando um valor novo, reduzir parcela ou apenas conhecer as possibilidades?"
+
+FECHAMENTO
+"Se fizer sentido, seguimos com a simulação. Se não fizer, sem problema."`
+};
+const normalizeScriptProduct=(value:string)=>{
+ const p=String(value||"").toLowerCase();
+ if(p.includes("inss"))return "INSS";
+ if(p.includes("siape"))return "SIAPE";
+ if(p.includes("fgts"))return "FGTS";
+ if(p.includes("clt")||p.includes("privado"))return "CLT";
+ return "Atendimento";
+};
+const resolveScript=(config:any,product:string)=>{
+ const key=normalizeScriptProduct(product);
+ const saved=config?.regras?.scripts||{};
+ return String(saved[key]||DEFAULT_OPERATION_SCRIPTS[key]||saved.Atendimento||DEFAULT_OPERATION_SCRIPTS.Atendimento);
+};
 const mask=(v="")=>v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4");
 const initials=(v="")=>v.split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
 const whatsappHref=(value:any)=>{const d=String(value??"").replace(/\D/g,"");const n=d.startsWith("55")&&(d.length===12||d.length===13)?d:((d.length===10||d.length===11)?"55"+d:d);return n.length>=12&&n.length<=13?"https://wa.me/"+n:""};
@@ -317,13 +386,13 @@ async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,
    <header className="header"><div><div className="eyebrow">CENTRAL OPERACIONAL • ONLINE</div><h1>{nav.find(x=>x[0]===mode)?.[1]}</h1><p>Operação de consignado, CRM e telefonia em um único painel.</p></div><div className="headActions"><span className="online"><b/> Sistema online • v{APP_VERSION}</span><button className="btn primary" onClick={()=>setShowImport(true)}>＋ Nova importação</button></div></header>
    {error&&<div className="alert error"><b>Erro:</b> {error}<button onClick={()=>setError("")}>×</button></div>}
    {msg&&<div className="alert success">{msg}<button onClick={()=>setMsg("")}>×</button></div>}
-   {mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length} campaigns={campaigns.length} returns={returns} calls={calls} loading={loading}/>}
+   {mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length} campaigns={campaigns.length} returns={returns} calls={calls} loading={loading} dialerConfig={dialerConfig} onSaveDialer={saveDialer}/>}
    {mode==="discador"&&<Dialer lead={current} available={available.length} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>{setSkippedLeadId(null);callResult(r)}} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} onNextLead={()=>{if(current){setSkippedLeadId(current.id);setMsg("Próximo lead selecionado.")}}} dialerConfig={dialerConfig}/>}
    {mode==="crm"&&<DeskCRM leads={leads} stages={stages} onMove={moveLead} onOpen={setSelectedLead} onChannel={sendChannel} operator={operator}/>}   {mode==="resultados"&&<OperationalResults leads={leads} onOpen={setSelectedLead}/>}
    {mode==="leads"&&<Leads leads={paged} loading={loading} search={search} setSearch={setSearch} page={page} setPage={setPage} total={filtered.length} pageSize={pageSize} onOpen={setSelectedLead}/>}
    {mode==="campanhas"&&<Campaigns rows={campaigns} onCreate={createCampaign} onToggle={toggleCampaign} onDelete={deleteCampaign}/>}
    {mode==="retornos"&&<Returns rows={returns} onOpenLead={setSelectedLead} onSave={updateReturn} onConclude={concludeReturn}/>}
-   {mode==="telefonia"&&<Telephony config={dialerConfig} onSave={saveDialer}/>}
+   {mode==="telefonia"&&<Telephony config={dialerConfig} onSave={saveDialer} target={current?.telefones?.[0]?.numero_normalizado}/>}
    {mode==="mensagens"&&<Omnichannel config={channelConfig} onSave={saveChannels}/>}
    {mode==="relatorios"&&<Reports leads={leads} npd={npd} calls={calls} returns={returns}/>}
    {mode==="npd"&&<Npd rows={npd} onRemove={removeNpd}/>}
@@ -342,7 +411,7 @@ function AuthScreen({recovery,onAuth,reset,updatePassword,msg,error}:{recovery:b
  return <div className="auth"><div className="authHero">{brand}<h1>Central inteligente para operações de consignado.</h1><p>Discador, CRM, mailing, retornos, bloqueios e indicadores em uma experiência única.</p><div className="heroBadges"><span>CRM integrado</span><span>Fila operacional</span><span>LGPD & auditoria</span></div></div><div className="authPanel"><div className="authBox"><div className="mobileLogo">{brand}</div><div className="eyebrow">A&K SOLUÇÕES FINANCEIRAS</div><h2>{forgot?"Recuperar acesso":s?"Criar proprietário":"Entrar na central"}</h2><p className="muted">{forgot?"Envie um link para seu e-mail.":s?"O primeiro cadastro deste projeto recebe automaticamente o perfil proprietário/admin.":"Use seu e-mail e senha para acessar."}</p>{s&&!forgot&&<div className="field"><label htmlFor="ak-field-02">Nome</label><input id="ak-field-02" value={n} onChange={x=>setN(x.target.value)} placeholder="Seu nome"/></div>}<div className="field"><label htmlFor="ak-field-03">E-mail</label><input id="ak-field-03" type="email" value={e} onChange={x=>setE(x.target.value)} placeholder="voce@empresa.com"/></div>{!forgot&&<div className="field"><label htmlFor="ak-field-04">Senha</label><input id="ak-field-04" type="password" value={p} onChange={x=>setP(x.target.value)} placeholder="Mínimo 8 caracteres"/></div>}{s&&!forgot&&<label htmlFor="ak-field-05" className="check"><input id="ak-field-05" type="checkbox" checked={terms} onChange={x=>setTerms(x.target.checked)}/><span>Li e aceito os <a href="/termos" target="_blank">Termos de Uso</a> e a <a href="/privacidade" target="_blank">Política de Privacidade</a>.</span></label>}{(error||msg)&&<div className={error?"notice danger":"notice"}>{error||msg}</div>}<button className="btn primary full big" disabled={busy||(s&&!terms)} onClick={submit}>{busy?"Processando...":forgot?"Enviar recuperação":s?"Criar minha conta":"Entrar"}</button><div className="authLinks">{!forgot&&<button onClick={()=>setS(!s)}>{s?"Já tenho acesso":"Primeiro acesso"}</button>}<button onClick={()=>{setForgot(!forgot);setS(false)}}>{forgot?"Voltar ao login":"Esqueci minha senha"}</button></div><small className="authNote">Se o cadastro exigir confirmação, o e-mail precisa ser confirmado antes do primeiro login.</small></div></div></div>;
 }
 
-function Dashboard({leads,available,npd,campaigns,returns,calls,loading}:{leads:Lead[];available:number;npd:number;campaigns:number;returns:ReturnRow[];calls:any[];loading:boolean}){
+function Dashboard({leads,available,npd,campaigns,returns,calls,loading,dialerConfig,onSaveDialer}:{leads:Lead[];available:number;npd:number;campaigns:number;returns:ReturnRow[];calls:any[];loading:boolean;dialerConfig:any;onSaveDialer:(d:any)=>void}){
  const opportunities=leads.filter(x=>["interessado","simulação","proposta","contrato"].includes(String(x.status||"").toLowerCase())).length;
  const pendingReturns=returns.filter(r=>!r.concluido).length;
  return <div className="stack">
@@ -376,8 +445,28 @@ function Dashboard({leads,available,npd,campaigns,returns,calls,loading}:{leads:
     </div>
    </div>
   </section>
+  <ScriptEditor config={dialerConfig} onSave={onSaveDialer}/>
   {loading&&<div className="loadingbar"/>}
  </div>;
+}
+function ScriptEditor({config,onSave}:{config:any;onSave:(d:any)=>void}){
+ const[open,setOpen]=useState(false),[product,setProduct]=useState("INSS"),[text,setText]=useState(""),[saved,setSaved]=useState(false);
+ useEffect(()=>{if(open){setText(resolveScript(config,product));setSaved(false)}},[open,product,config]);
+ const save=()=>{
+  const scripts={...(config?.regras?.scripts||{}),[product]:text};
+  onSave({...config,regras:{...(config?.regras||{}),scripts}});
+  setSaved(true);
+ };
+ return <section className="panel">
+  <div className="toolbar"><PanelTitle title="Script de ligação" subtitle="Edite o que o operador deve falar. O mesmo script salvo aqui aparece automaticamente no Discador conforme o produto do lead."/><button className="btn primary" onClick={()=>setOpen(true)}>✎ Editar script</button></div>
+  {open&&<div className="modal" onClick={()=>setOpen(false)}><div className="modalBox" onClick={e=>e.stopPropagation()}>
+   <div className="toolbar"><div><div className="eyebrow">OPERAÇÃO 360 • SCRIPT</div><h2>Editar script do operador</h2><p>As alterações ficam salvas na configuração da operação e sincronizadas com o Discador.</p></div><button className="btn" onClick={()=>setOpen(false)}>Fechar</button></div>
+   <div className="field"><label htmlFor="ak-script-product">Produto</label><select id="ak-script-product" value={product} onChange={e=>setProduct(e.target.value)}><option>INSS</option><option>SIAPE</option><option>FGTS</option><option>CLT</option><option>Atendimento</option></select></div>
+   <div className="field"><label htmlFor="ak-script-editor">Texto falado pelo operador</label><textarea id="ak-script-editor" className="textarea" style={{minHeight:420}} value={text} onChange={e=>setText(e.target.value)} placeholder={"Use [NOME] para preencher automaticamente o nome do cliente."}/></div>
+   <div className="info">Use <b>[NOME]</b> para o nome automático do cliente e <b>[SEU NOME]</b> para o operador.</div>
+   <div className="actionRow"><button className="btn primary" onClick={save}>Salvar script</button>{saved&&<span className="pill">Salvo e sincronizado</span>}</div>
+  </div></div>}
+ </section>;
 }
 function Metric({title,value,icon,hint}:{title:string;value:number;icon:string;hint:string}){return <div className="panel metric"><div className="metricIcon">{icon}</div><div><span>{title}</span><strong>{value}</strong><small>{hint}</small></div></div>}
 function PanelTitle({title,subtitle}:{title:string;subtitle:string}){return <div className="panelTitle"><div><h3>{title}</h3><p>{subtitle}</p></div></div>}
@@ -385,7 +474,7 @@ function PanelTitle({title,subtitle}:{title:string;subtitle:string}){return <div
 function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,onNextLead,dialerConfig}:{lead?:Lead;available:number;onCall:()=>void;onResult:(r:string)=>void;onReturn:(dateTime:string,observacao:string)=>void;onBlock:()=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;onNextLead:()=>void;dialerConfig?:any}){
  const[showReturn,setShowReturn]=useState(false),[paused,setPaused]=useState(false),[calling,setCalling]=useState(false),[dateTime,setDateTime]=useState(()=>{const d=new Date(Date.now()+86400000);d.setHours(9,0,0,0);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}),[obs,setObs]=useState("");
  useEffect(()=>{if(paused||!lead)return;const t=window.setTimeout(()=>{setCalling(true);onCall()},1200);return()=>window.clearTimeout(t)},[paused,lead?.id]);
- return <div className="stack"><div className="panel"><div className="dialHeader"><span className="statusDot"/>Fila ativa <b>{available}</b><span style={{marginLeft:"auto"}}>Discagem automática ativa</span></div></div><div className="dialGrid"><section className="panel callPanel">{lead?<><div className="person"><div className="personAvatar">{initials(lead.nome)}</div><div><div className="eyebrow">PRÓXIMO CONTATO</div><h2>{lead.nome}</h2><p>{lead.cidade||"Cidade não informada"} {lead.uf&&"• "+lead.uf}</p></div></div><div className="dialNumber">{lead.telefones?.[0]?.numero_normalizado||"Sem telefone"}</div><div className="callActions"><button className="btn callBtn" disabled={paused} onClick={()=>{setCalling(true);onCall()}}>☎ {calling?"CHAMANDO":"LIGAR"}</button><button className="btn" onClick={()=>{setCalling(false);onNextLead()}}>⇄ PRÓXIMO LEAD</button><button className="btn dangerBtn" onClick={()=>{setCalling(false);onResult("Não atendeu")}}>■ ENCERRAR</button><button className="btn dangerBtn" onClick={()=>setPaused(x=>!x)}>{paused?"▶ RETOMAR":"Ⅱ PAUSAR"}</button>{whatsappHref(lead.telefones?.[0]?.numero_normalizado)&&<a className="btn" href={whatsappHref(lead.telefones?.[0]?.numero_normalizado)} target="_blank" rel="noreferrer">◉ WHATSAPP</a>}<button className="btn" onClick={()=>setShowReturn(true)}>◷ AGENDAR RETORNO</button><button className="btn" onClick={()=>lead&&onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO</button><button className="btn dangerBtn" onClick={onBlock}>⊘ NÃO LIGAR MAIS</button></div></>:<Empty title="Fila vazia" text="Importe uma lista para iniciar a operação."/>}</section><section className="panel"><PanelTitle title="Script do discador" subtitle="Script sincronizado com o produto e com o fluxo da operação."/><div className="scriptCard"><div className="eyebrow">{lead?.produto||"CONSIGNADO"}</div><p>Cliente: <b>{lead?.nome||"—"}</b></p><p>{lead?.telefones?.[0]?.numero_normalizado||"—"}</p><div className="scriptBlock"><b>ABERTURA</b><p>"Oi, {lead?.nome||"cliente"}, tudo bem? Aqui é da A&K Soluções Financeiras. Posso falar rapidinho sobre uma possibilidade disponível para você?"</p><b>MOTIVO</b><p>"Quero verificar as condições e fazer uma simulação para você conhecer valores, taxas e demais informações antes de contratar."</p><b>QUALIFICAÇÃO</b><p>"Posso confirmar se você tem interesse em verificar essa possibilidade?"</p><b>FECHAMENTO</b><p>"Posso enviar a simulação pelo WhatsApp para você analisar com calma?"</p></div><div className="callActions"><button className="btn primary" onClick={()=>lead&&onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO VIA WHATSAPP</button></div></div></section><section className="panel"><PanelTitle title="Tabulação" subtitle="Registre o resultado da ligação para avançar automaticamente."/><div className="resultGrid">{results.map(r=><button key={r} onClick={()=>r==="Retorno"?setShowReturn(true):onResult(r)}>{r}</button>)}</div></section></div>{showReturn&&<div className="modal" onClick={()=>setShowReturn(false)}><div className="modalBox smallModal" onClick={e=>e.stopPropagation()}><div className="toolbar"><div><div className="eyebrow">RETORNO</div><h2>Agendar retorno</h2><p>{lead?.nome}</p></div><button className="btn" onClick={()=>setShowReturn(false)}>Fechar</button></div><div className="field"><label htmlFor="ak-field-07">Data e hora</label><input id="ak-field-07" type="datetime-local" value={dateTime} min={new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)} onChange={e=>setDateTime(e.target.value)}/></div><div className="field"><label htmlFor="ak-field-08">Observação</label><textarea id="ak-field-08" className="textarea" value={obs} onChange={e=>setObs(e.target.value)} placeholder="Ex.: retornar após 15h, enviar simulação..."/></div><button className="btn primary full big" onClick={()=>{onReturn(dateTime,obs);setShowReturn(false);setObs("")}}>Salvar e próximo lead</button></div></div>}</div>
+ return <div className="stack"><div className="panel"><div className="dialHeader"><span className="statusDot"/>Fila ativa <b>{available}</b><span style={{marginLeft:"auto"}}>Discagem automática ativa</span></div></div><div className="dialGrid"><section className="panel callPanel">{lead?<><div className="person"><div className="personAvatar">{initials(lead.nome)}</div><div><div className="eyebrow">PRÓXIMO CONTATO</div><h2>{lead.nome}</h2><p>{lead.cidade||"Cidade não informada"} {lead.uf&&"• "+lead.uf}</p></div></div><div className="dialNumber">{lead.telefones?.[0]?.numero_normalizado||"Sem telefone"}</div><div className="callActions"><div className="btn callBtn" aria-live="polite">☎ {calling?"CHAMANDO":"AGUARDANDO CHAMADA AUTOMÁTICA"}</div><button className="btn" onClick={()=>{setCalling(false);onNextLead()}}>⇄ PRÓXIMO LEAD</button><button className="btn dangerBtn" onClick={()=>{setCalling(false);onResult("Não atendeu")}}>■ ENCERRAR</button><button className="btn dangerBtn" onClick={()=>setPaused(x=>!x)}>{paused?"▶ RETOMAR":"Ⅱ PAUSAR"}</button>{whatsappHref(lead.telefones?.[0]?.numero_normalizado)&&<a className="btn" href={whatsappHref(lead.telefones?.[0]?.numero_normalizado)} target="_blank" rel="noreferrer">◉ WHATSAPP</a>}<button className="btn" onClick={()=>setShowReturn(true)}>◷ AGENDAR RETORNO</button><button className="btn" onClick={()=>lead&&onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO</button><button className="btn dangerBtn" onClick={onBlock}>⊘ NÃO LIGAR MAIS</button></div></>:<Empty title="Fila vazia" text="Importe uma lista para iniciar a operação."/>}</section><section className="panel"><PanelTitle title="Script do discador" subtitle="Script sincronizado com o script salvo na Operação 360."/><div className="scriptCard"><div className="eyebrow">{lead?.produto||"CONSIGNADO"}</div><p>Cliente: <b>{lead?.nome||"—"}</b></p><p>{lead?.telefones?.[0]?.numero_normalizado||"—"}</p><div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font: "inherit",lineHeight:1.6,margin:0}}>{resolveScript(dialerConfig,lead?.produto||"Atendimento").replaceAll("[NOME]",lead?.nome||"cliente")}</pre></div><div className="callActions"><button className="btn primary" onClick={()=>lead&&onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO VIA WHATSAPP</button></div><div className="info">Script editável no Dashboard → Script de ligação. A alteração feita no painel é usada automaticamente pelo operador.</div></div></section></section><section className="panel"><PanelTitle title="Tabulação" subtitle="Registre o resultado da ligação para avançar automaticamente."/><div className="resultGrid">{results.map(r=><button key={r} onClick={()=>r==="Retorno"?setShowReturn(true):onResult(r)}>{r}</button>)}</div></section></div>{showReturn&&<div className="modal" onClick={()=>setShowReturn(false)}><div className="modalBox smallModal" onClick={e=>e.stopPropagation()}><div className="toolbar"><div><div className="eyebrow">RETORNO</div><h2>Agendar retorno</h2><p>{lead?.nome}</p></div><button className="btn" onClick={()=>setShowReturn(false)}>Fechar</button></div><div className="field"><label htmlFor="ak-field-07">Data e hora</label><input id="ak-field-07" type="datetime-local" value={dateTime} min={new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)} onChange={e=>setDateTime(e.target.value)}/></div><div className="field"><label htmlFor="ak-field-08">Observação</label><textarea id="ak-field-08" className="textarea" value={obs} onChange={e=>setObs(e.target.value)} placeholder="Ex.: retornar após 15h, enviar simulação..."/></div><button className="btn primary full big" onClick={()=>{onReturn(dateTime,obs);setShowReturn(false);setObs("")}}>Salvar e próximo lead</button></div></div>}</div>
 }
 function DeskCRM({leads,stages,onMove,onOpen,onChannel,operator}:{leads:Lead[];stages:Stage[];onMove:(id:string,s:string)=>void;onOpen:(l:Lead)=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;operator:any}){
  const[tabs,setTabs]=useState("radar"),[conversas,setConversas]=useState<any[]>([]),[tarefas,setTarefas]=useState<any[]>([]),[propostas,setPropostas]=useState<any[]>([]),[automacoes,setAutomacoes]=useState<any[]>([]),[auditoria,setAuditoria]=useState<any[]>([]),[selected,setSelected]=useState<Lead|null>(null),[loading,setLoading]=useState(false),[query,setQuery]=useState(""),[taskTitle,setTaskTitle]=useState(""),[taskLead,setTaskLead]=useState(""),[taskDue,setTaskDue]=useState(""),[proposalLead,setProposalLead]=useState(""),[proposalValue,setProposalValue]=useState(""),[proposalProduct,setProposalProduct]=useState("Consignado"),[autoName,setAutoName]=useState(""),[autoEvent,setAutoEvent]=useState("ligacao_resultado"),[message,setMessage]=useState(""),[conversation,setConversation]=useState<any>(null);
@@ -452,7 +541,7 @@ function Returns({rows,onOpenLead,onSave,onConclude}:{rows:ReturnRow[];onOpenLea
   {edit&&<div className="modal" onClick={()=>setEdit(null)}><div className="modalBox smallModal" onClick={e=>e.stopPropagation()}><div className="toolbar"><div><div className="eyebrow">RETORNO</div><h2>Reagendar</h2><p>{edit.lead?.nome||"Cliente"}</p></div><button className="btn" onClick={()=>setEdit(null)}>Fechar</button></div><div className="field"><label htmlFor="ak-field-26">Data e hora</label><input id="ak-field-26" type="datetime-local" value={dateTime} onChange={e=>setDateTime(e.target.value)}/></div><div className="field"><label htmlFor="ak-field-27">Observação</label><textarea id="ak-field-27" className="textarea" value={obs} onChange={e=>setObs(e.target.value)}/></div><button className="btn primary full big" onClick={()=>{onSave(edit.id,{data_hora:dateTime,observacao:obs});setEdit(null)}}>Salvar retorno</button></div></div>}
  </div>
 }
-function Telephony({config,onSave}:{config:any;onSave:(d:any)=>void}){
+function Telephony({config,onSave,target}:{config:any;onSave:(d:any)=>void;target?:string}){
  const[form,setForm]=useState<any>(()=>({modo:config?.modo||"preview",chamadas_simultaneas:config?.chamadas_simultaneas||1,retentativas:config?.retentativas||2,intervalo_segundos:config?.intervalo_segundos||30,ativo:config?.ativo??true,regras:config?.regras||{sip_host:"",ramal:"",fila:"",ura:"",horario:"",gravacao:true,monitoria:true}}));
  useEffect(()=>setForm({modo:config?.modo||"preview",chamadas_simultaneas:config?.chamadas_simultaneas||1,retentativas:config?.retentativas||2,intervalo_segundos:config?.intervalo_segundos||30,ativo:config?.ativo??true,regras:config?.regras||{sip_host:"",ramal:"",fila:"",ura:"",horario:"",gravacao:true,monitoria:true}}),[config]);
  const set=(k:string,v:any)=>setForm((x:any)=>({...x,[k]:v}));const setR=(k:string,v:any)=>setForm((x:any)=>({...x,regras:{...x.regras,[k]:v}}));
