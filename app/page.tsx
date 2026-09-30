@@ -260,14 +260,33 @@ async function saveChannelsFor(targetId:string,data:any){
   if(e)setError(e.message);else{if(targetId===operator.id)setChannelConfig({...channelConfig,...data});await audit("canais_configurados","configuracoes_canais",targetId);setMsg("Configurações de canais salvas.")}
 }
 async function sendChannel(channel:"whatsapp"|"sms",lead:Lead){
-  const to=lead.telefones?.[0]?.numero_normalizado||"";if(!to){setError("Lead sem telefone.");return}
-  const message=channel==="whatsapp"?`Olá, ${lead.nome.split(" ")[0]}. Conforme conversamos, segue sua simulação da A&K Soluções Financeiras. Posso te enviar os detalhes e condições para você analisar com calma?`:`A&K Soluções Financeiras: seu link de aceite será enviado após a confirmação da simulação. Se precisar, fale conosco.`;
+  const to=lead.telefones?.[0]?.numero_normalizado||"";
+  if(!to){setError("Lead sem telefone.");return}
+  const message=channel==="whatsapp"
+    ? `Olá, ${lead.nome.split(" ")[0]}. Conforme conversamos, segue sua simulação da A&K Soluções Financeiras. Posso te enviar os detalhes e condições para você analisar com calma?`
+    : `A&K Soluções Financeiras: seu link de aceite será enviado após a confirmação da simulação. Se precisar, fale conosco.`;
   try{
+    const cfg=channelConfig?.configuracoes?.[channel];
+    if(channel==="whatsapp" && (!cfg?.ativo || !cfg?.url) && channelConfig?.configuracoes?.whatsapp_modo==="pc"){
+      const d=String(to).replace(/\D/g,""),n=d.startsWith("55")?d:"55"+d;
+      window.open("https://wa.me/"+n+"?text="+encodeURIComponent(message),"_blank","noopener,noreferrer");
+      setMsg("WhatsApp aberto com a simulação pronta para envio.");
+      return;
+    }
+    if(channel==="sms" && (!cfg?.ativo || !cfg?.url)){
+      const d=String(to).replace(/\D/g,""),n=d.startsWith("55")?d.slice(2):d;
+      window.location.href="sms:"+n+"?body="+encodeURIComponent(message);
+      setMsg("Aplicativo de SMS aberto com a mensagem pronta.");
+      return;
+    }
     const r=await fetch("/api/channels/test",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({channel,to,message,lead_id:lead.id,purpose:channel==="whatsapp"?"simulacao":"aceite"})});
-    const body=await r.json();if(!r.ok)throw new Error(body?.error||"Falha no envio.");
-    setMsg(channel==="whatsapp"?"Simulação enviada pelo canal configurado.":"Link de aceite solicitado pelo canal configurado.");await audit("mensagem_disparo","leads",lead.id,{channel,purpose:channel==="whatsapp"?"simulacao":"aceite"});
+    const body=await r.json();
+    if(!r.ok)throw new Error(body?.error||"Falha no envio.");
+    setMsg(channel==="whatsapp"?"Simulação enviada pelo canal configurado.":"Link de aceite enviado pelo canal configurado.");
+    await audit("mensagem_disparo","leads",lead.id,{channel,purpose:channel==="whatsapp"?"simulacao":"aceite"});
   }catch(e:any){setError(e?.message||"Não foi possível enviar pelo canal configurado.");}
 }
+
 async function saveChannels(data:any){if(operator)await saveChannelsFor(operator.id,data)}
 async function saveDialerFor(targetId:string,data:any){
   if(!supabase||!operator)return;
