@@ -4,7 +4,7 @@ import {supabase} from "@/lib/supabase";
 import {parseFile,phone,cpf} from "@/lib/importer";
 import SipSoftphone from "@/app/components/sip-softphone";
 
-type Lead={id:string;nome:string;cpf?:string;cidade?:string;uf?:string;produto?:string;status:string;prioridade:number;margem_disponivel?:number;tentativas_contato?:number;bloqueado:boolean;opt_out:boolean;telefones?:{id:string;numero_normalizado:string}[];created_at?:string};
+type Lead={id:string;nome:string;cpf?:string;cidade?:string;uf?:string;produto?:string;status:string;prioridade:number;margem_disponivel?:number;tentativas_contato?:number;bloqueado:boolean;opt_out:boolean;dados_extras?:Record<string,any>;telefones?:{id:string;numero_normalizado:string}[];created_at?:string};
 type Stage={id:string;nome:string;cor:string;ordem:number};
 type Campaign={id:string;nome:string;produto?:string;status:string;created_at:string;inicio_at?:string;fim_at?:string};
 type ReturnRow={id:string;lead_id:string;operador_id?:string;data_hora:string;observacao?:string;concluido:boolean;lead?:any};
@@ -62,6 +62,24 @@ const resolveScript=(scripts:CallScript[],product:string)=>{
  const exact=scripts.find(s=>s.ativo&&(normalizeText(s.chave)===normalizeText(String(product||""))||normalizeText(s.nome)===normalizeText(String(product||""))));
  if(exact)return exact.conteudo;
  return DEFAULT_OPERATION_SCRIPTS[key]||DEFAULT_OPERATION_SCRIPTS.Atendimento;
+};
+const fillScript=(template:string,lead?:Lead,operator?:any)=>{
+ const extras=lead?.dados_extras||{}, imported=extras._importacao||{};
+ const lookup=(aliases:string[])=>{
+  const hit=Object.entries(extras).find(([key,value])=>aliases.some(a=>normalizeText(key)===normalizeText(a))&&String(value??"").trim());
+  return hit?.[1]??"";
+ };
+ const banco=String(imported.banco||lookup(["banco","banco atual","instituicao","instituição"])||"").trim();
+ const produto=String(imported.produto_original||lead?.produto||"Atendimento").replace(/\s*•\s*Banco:\s*.+$/i,"").trim();
+ const valor=String(lookup(["valor","valor crédito","valor credito","valor_solicitado","valor solicitado","valor liberado","valor liberado"])||lead?.margem_disponivel||"").trim();
+ const operatorName=String(operator?.nome||"Operador").trim();
+ return String(template||"")
+  .replaceAll("[NOME]",lead?.nome||"cliente")
+  .replaceAll("[SEU NOME]",operatorName)
+  .replaceAll("[OPERADOR]",operatorName)
+  .replaceAll("[BANCO]",banco||"banco da análise")
+  .replaceAll("[PRODUTO]",produto||"solução financeira")
+  .replaceAll("[VALOR]",valor||"valor a consultar");
 };
 const mask=(v="")=>v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4");
 const initials=(v="")=>v.split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
@@ -130,7 +148,7 @@ export default function Home(){
   if(!supabase)return;
   setLoading(true);setError("");
   try{
-    const leadSelect="id,nome,cpf,cidade,uf,produto,status,prioridade,margem_disponivel,tentativas_contato,bloqueado,opt_out,created_at,updated_at,telefones(id,numero_normalizado)";
+    const leadSelect="id,nome,cpf,cidade,uf,produto,status,prioridade,margem_disponivel,tentativas_contato,bloqueado,opt_out,dados_extras,created_at,updated_at,telefones(id,numero_normalizado)";
     const jobs:any[]=[];
     if(["dashboard","discador","crm","leads","retornos","resultados","relatorios"].includes(targetMode))
       jobs.push(supabase.from("leads").select(leadSelect).order("prioridade",{ascending:false}).order("created_at",{ascending:false}).limit(1000).then(x=>["leads",x]));
@@ -389,7 +407,7 @@ async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,
    {error&&<div className="alert error"><b>Erro:</b> {error}<button onClick={()=>setError("")}>×</button></div>}
    {msg&&<div className="alert success">{msg}<button onClick={()=>setMsg("")}>×</button></div>}
    {mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length} campaigns={campaigns.length} returns={returns} calls={calls} loading={loading} dialerConfig={dialerConfig} onSaveDialer={saveDialer}/>}
-   {mode==="discador"&&<Dialer lead={current} available={available.length} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>{setSkippedLeadId(null);callResult(r)}} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} onNextLead={()=>{if(current){setSkippedLeadId(current.id);setMsg("Próximo lead selecionado.")}}} scripts={scripts}/>}
+   {mode==="discador"&&<Dialer lead={current} available={available.length} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>{setSkippedLeadId(null);callResult(r)}} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} onNextLead={()=>{if(current){setSkippedLeadId(current.id);setMsg("Próximo lead selecionado.")}}} scripts={scripts} operator={operator}/>}
    {mode==="crm"&&<DeskCRM leads={leads} stages={stages} onMove={moveLead} onOpen={setSelectedLead} onChannel={sendChannel} operator={operator}/>}   {mode==="resultados"&&<OperationalResults leads={leads} onOpen={setSelectedLead}/>}
    {mode==="leads"&&<Leads leads={paged} loading={loading} search={search} setSearch={setSearch} page={page} setPage={setPage} total={filtered.length} pageSize={pageSize} onOpen={setSelectedLead}/>}
    {mode==="campanhas"&&<Campaigns rows={campaigns} onCreate={createCampaign} onToggle={toggleCampaign} onDelete={deleteCampaign}/>}
@@ -484,7 +502,7 @@ function ScriptManager({scripts,onSave,canEdit}:{scripts:CallScript[];onSave:(da
 function Metric({title,value,icon,hint}:{title:string;value:number;icon:string;hint:string}){return <div className="panel metric"><div className="metricIcon">{icon}</div><div><span>{title}</span><strong>{value}</strong><small>{hint}</small></div></div>}
 function PanelTitle({title,subtitle}:{title:string;subtitle:string}){return <div className="panelTitle"><div><h3>{title}</h3><p>{subtitle}</p></div></div>}
 
-function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,onNextLead,scripts}:{lead?:Lead;available:number;onCall:()=>void;onResult:(r:string)=>void;onReturn:(dateTime:string,observacao:string)=>void;onBlock:()=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;onNextLead:()=>void;scripts:CallScript[]}){
+function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,onNextLead,scripts,operator}:{lead?:Lead;available:number;onCall:()=>void;onResult:(r:string)=>void;onReturn:(dateTime:string,observacao:string)=>void;onBlock:()=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;onNextLead:()=>void;scripts:CallScript[];operator?:any}){
  const[showReturn,setShowReturn]=useState(false),[paused,setPaused]=useState(false),[calling,setCalling]=useState(false),[dateTime,setDateTime]=useState(()=>{const d=new Date(Date.now()+86400000);d.setHours(9,0,0,0);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}),[obs,setObs]=useState("");
  useEffect(()=>{if(paused||!lead)return;const t=window.setTimeout(()=>{setCalling(true);onCall()},1200);return()=>window.clearTimeout(t)},[paused,lead?.id]);
  return <div className="stack">
@@ -511,7 +529,7 @@ function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,onNex
      <div className="eyebrow">{lead?.produto||"CONSIGNADO"}</div>
      <p>Cliente: <b>{lead?.nome||"—"}</b></p>
      <p>{lead?.telefones?.[0]?.numero_normalizado||"—"}</p>
-     <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.6,margin:0}}>{resolveScript(scripts,lead?.produto||"Atendimento").replaceAll("[NOME]",lead?.nome||"cliente").replaceAll("[OPERADOR]",operator?.nome||"operador")}</pre></div>
+     <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.6,margin:0}}>{fillScript(resolveScript(scripts,lead?.produto||"Atendimento"),lead,operator)}</pre></div>
      <div className="callActions"><button className="btn primary" onClick={()=>lead&&onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO VIA WHATSAPP</button></div>
      <div className="info">Edite este roteiro em Scripts de ligação. A alteração é compartilhada automaticamente com todos os leads desse produto.</div>
     </div>
