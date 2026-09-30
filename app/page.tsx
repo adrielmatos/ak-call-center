@@ -72,6 +72,24 @@ const initials = (v = "") =>
     .join("")
     .toUpperCase();
 
+const NavIcon = ({ name }: { name: string }) => {
+  const paths: Record<string,string> = {
+    dashboard:"M3 12h18M12 3v18",
+    discador:"M5 4h14v16H5zM8 8h8M8 12h8M8 16h5",
+    crm:"M4 5h6v6H4zM14 5h6v6h-6zM9 14h6v6H9z",
+    resultados:"M5 19l5-5 3 3 6-8",
+    leads:"M4 5h16v14H4zM8 9h8M8 13h5",
+    campanhas:"M5 4h14v16H5zM8 8h8M8 12h8",
+    retornos:"M12 6v6l4 2M21 12a9 9 0 1 1-18 0",
+    telefonia:"M6 4h12v16H6zM9 8h6M9 12h6M9 16h4",
+    mensagens:"M4 5h16v11H8l-4 3z",
+    relatorios:"M5 20V10M12 20V4M19 20v-7",
+    npd:"M5 5l14 14M19 5L5 19M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18",
+    config:"M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M4 12h2M18 12h2M12 4v2M12 18v2"
+  };
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d={paths[name]||paths.dashboard}/></svg>;
+};
+
 const whatsappHref = (value: any) => {
   const d = String(value ?? "").replace(/\D/g, "");
   const n =
@@ -872,7 +890,7 @@ export default function Home() {
         <nav>
           {nav.map(([id, label, icon]) => (
             <button key={id} className={mode === id ? "active" : ""} onClick={() => setMode(id)}>
-              <i>{icon}</i>
+              <i><NavIcon name={id}/></i>
               {label}
             </button>
           ))}
