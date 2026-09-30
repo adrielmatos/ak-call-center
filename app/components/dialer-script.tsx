@@ -167,7 +167,7 @@ export default function DialerScript() {
     const remove = () => document.querySelectorAll("[data-ak-dialer-script]").forEach((node) => node.remove());
     const escapeHtml = (value: string) => value.replace(/[&<>\"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[char] || char));
 
-    const render = (leadName: string, phone: string, productRaw: string) => {
+    const render = (leadName: string, phone: string, productRaw: string, leadId: string) => {
       if (disposed) return;
       const grid = document.querySelector(".dialGrid");
       const callPanel = grid?.querySelector(".callPanel");
@@ -184,15 +184,34 @@ export default function DialerScript() {
       card.dataset.akDialerScript = "true";
       card.className = "panel akDialerScript";
       card.style.cssText = "padding:22px;align-self:start;max-height:calc(100vh - 210px);overflow:auto;position:sticky;top:18px";
-      card.innerHTML = `<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px"><div><div style="font-size:12px;font-weight:800;letter-spacing:.08em;opacity:.7">SCRIPT DO DISCADOR</div><h3 style="font-size:22px;margin:4px 0">${escapeHtml(product)}</h3><div style="font-size:14px;opacity:.8">Cliente: <b>${escapeHtml(leadName)}</b></div></div><span style="padding:6px 9px;border-radius:999px;background:rgba(59,130,246,.1);font-size:12px;font-weight:800">${escapeHtml(phone)}</span></div><textarea readonly style="width:100%;min-height:390px;resize:vertical;border:1px solid rgba(148,163,184,.25);border-radius:12px;padding:14px;font:inherit;line-height:1.55;background:rgba(15,23,42,.03);color:inherit">${escapeHtml(script.replaceAll("[NOME]", leadName))}</textarea><div style="margin-top:12px;font-size:12px;line-height:1.5;opacity:.7">Script sincronizado com Operação 360. Para alterar, edite e salve o script do produto em <b>Operação 360 → Script de ligação</b>.</div>`;
+      card.innerHTML = `<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px"><div><div style="font-size:12px;font-weight:800;letter-spacing:.08em;opacity:.7">SCRIPT DO DISCADOR</div><h3 style="font-size:22px;margin:4px 0">${escapeHtml(product)}</h3><div style="font-size:14px;opacity:.8">Cliente: <b>${escapeHtml(leadName)}</b></div></div><span style="padding:6px 9px;border-radius:999px;background:rgba(59,130,246,.1);font-size:12px;font-weight:800">${escapeHtml(phone)}</span></div><textarea readonly style="width:100%;min-height:390px;resize:vertical;border:1px solid rgba(148,163,184,.25);border-radius:12px;padding:14px;font:inherit;line-height:1.55;background:rgba(15,23,42,.03);color:inherit">${escapeHtml(script.replaceAll("[NOME]", leadName))}</textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button type="button" data-ak-send="whatsapp" style="border:1px solid rgba(59,130,246,.25);background:#fff;border-radius:9px;padding:9px 12px;font:inherit;font-size:12px;font-weight:800;cursor:pointer">💬 Enviar simulação via WhatsApp</button><button type="button" data-ak-send="sms" style="border:1px solid rgba(59,130,246,.25);background:#fff;border-radius:9px;padding:9px 12px;font:inherit;font-size:12px;font-weight:800;cursor:pointer">✉ Enviar link de aceite via SMS</button></div><div style="margin-top:12px;font-size:12px;line-height:1.5;opacity:.7">Script sincronizado com Operação 360. Para alterar, edite e salve o script do produto em <b>Operação 360 → Script de ligação</b>.</div>`;
       grid.insertBefore(card, callPanel.nextSibling);
+      card.querySelectorAll<HTMLButtonElement>("[data-ak-send]").forEach((button)=>{
+        button.addEventListener("click",async()=>{
+          button.disabled=true;
+          const channel=button.dataset.akSend||"whatsapp";
+          const message=channel==="whatsapp"
+            ? `Olá, ${leadName.split(" ")[0]}. Conforme conversamos, segue sua simulação da A&K Soluções Financeiras. Posso te enviar os detalhes e condições para você analisar com calma?`
+            : "A&K Soluções Financeiras: seu link de aceite será enviado após a confirmação da simulação.";
+          try{
+            const response=await fetch("/api/channels/test",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({channel,to:phone,message,lead_id:leadId,purpose:channel==="whatsapp"?"simulacao":"aceite"})});
+            const data=await response.json();
+            if(!response.ok)throw new Error(data?.error||"Falha no envio.");
+            button.textContent=channel==="whatsapp"?"✓ Simulação enviada":"✓ Link solicitado";
+          }catch(error:any){
+            button.disabled=false;
+            button.textContent="Falha — tentar novamente";
+            console.error(error);
+          }
+        });
+      });
     };
 
     const load = async () => {
       const phone = String(document.querySelector(".dialNumber")?.textContent || "").replace(/\D/g, "");
       const name = String(document.querySelector(".person h2")?.textContent || "").trim();
       if (!phone || !name || !document.querySelector(".callPanel")) { remove(); lastKey = ""; return; }
-      if (!supabase) { render(name, phone, "Atendimento"); return; }
+      if (!supabase) { render(name, phone, "Atendimento", leadId); return; }
       const { data: phones } = await supabase.from("telefones").select("lead_id").eq("numero_normalizado", phone).eq("ativo", true).limit(1);
       const leadId = phones?.[0]?.lead_id;
       if (!leadId) { render(name, phone, "Atendimento"); return; }
