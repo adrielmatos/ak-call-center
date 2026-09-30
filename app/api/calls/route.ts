@@ -3,13 +3,17 @@ import {z} from "zod";
 import {createServerSupabaseClient} from "@/lib/supabase/server";
 
 const schema=z.object({
+  action:z.enum(["start","finish"]).default("finish"),
+  call_id:z.string().uuid().optional(),
   lead_id:z.string().uuid(),
   telefone_id:z.string().uuid().optional(),
   campanha_id:z.string().uuid().optional(),
   inicio:z.string().datetime().optional(),
   fim:z.string().datetime().optional(),
-  resultado:z.string().trim().min(1).max(80),
+  resultado:z.string().trim().min(1).max(80).optional(),
   observacao:z.string().trim().max(2000).optional(),
+  gravacao_url:z.string().url().max(2000).optional(),
+  tabulacao:z.record(z.string(),z.any()).optional(),
   consentimento:z.boolean().optional(),
   consentimento_tipo:z.string().trim().max(80).optional()
 }).strict();
@@ -52,23 +56,56 @@ export async function POST(request:Request){
   if(!lead)return NextResponse.json({error:{code:"lead_not_found",message:"Lead não encontrado."}},{status:404,headers:{"x-request-id":requestId}});
   if(lead.bloqueado||lead.opt_out)return NextResponse.json({error:{code:"lead_blocked",message:"Lead bloqueado para contato."}},{status:409,headers:{"x-request-id":requestId}});
 
-  const {data:call,error:ce}=await supabase.from("ligacoes").insert({
-    lead_id:input.lead_id,telefone_id:input.telefone_id||null,campanha_id:input.campanha_id||null,
-    operador_id:operator.id,inicio,fim,resultado:input.resultado,observacao:input.observacao||null
-  }).select("*").single();
-  if(ce)return NextResponse.json({error:{code:"call_create_failed",message:ce.message}},{status:400,headers:{"x-request-id":requestId}});
+  let call:any=null;
+  if(input.action==="start"){
+    const {data:created,error:ce}=await supabase.from("ligacoes").insert({
+      lead_id:input.lead_id,telefone_id:input.telefone_id||null,campanha_id:input.campanha_id||null,
+      operador_id:operator.id,inicio,fim:null,resultado:"Em andamento",observacao:"Chamada iniciada pelo discador"
+    }).select("*").single();
+    if(ce)return NextResponse.json({error:{code:"call_create_failed",message:ce.message}},{status:400,headers:{"x-request-id":requestId}});
+    call=created;
+  }else{
+    if(input.call_id){
+      const {data:existing}=await supabase.from("ligacoes").select("*").eq("id",input.call_id).eq("operador_id",operator.id).maybeSingle();
+      call=existing||null;
+    }
+    if(!call){
+      const {data:existing}=await supabase.from("ligacoes").select("*").eq("lead_id",input.lead_id).eq("operador_id",operator.id).eq("resultado","Em andamento").order("created_at",{ascending:false}).limit(1).maybeSingle();
+      call=existing||null;
+    }
+    const finalInicio=call?.inicio||inicio;
+    const finalFim=input.fim||new Date().toISOString();
+    const duration=Math.max(0,Math.round((new Date(finalFim).getTime()-new Date(finalInicio).getTime())/1000));
+    if(call){
+      const {data:updated,error:ue}=await supabase.from("ligacoes").update({
+        telefone_id:input.telefone_id||call.telefone_id,
+        fim:finalFim,
+        resultado:input.resultado||"Finalizado",
+        observacao:input.observacao||call.observacao||null,
+        duracao_segundos:duration,
+        gravacao_url:input.gravacao_url||null,
+        tabulacao:input.tabulacao||{}
+      }).eq("id",call.id).eq("operador_id",operator.id).select("*").single();
+      if(ue)return NextResponse.json({error:{code:"call_update_failed",message:ue.message}},{status:400,headers:{"x-request-id":requestId}});
+      call=updated;
+    }else{
+      const {data:created,error:ce}=await supabase.from("ligacoes").insert({
+        lead_id:input.lead_id,telefone_id:input.telefone_id||null,campanha_id:input.campanha_id||null,
+        operador_id:operator.id,inicio:finalInicio,fim:finalFim,resultado:input.resultado||"Finalizado",observacao:input.observacao||null,
+        duracao_segundos:duration,gravacao_url:input.gravacao_url||null,tabulacao:input.tabulacao||{}
+      }).select("*").single();
+      if(ce)return NextResponse.json({error:{code:"call_create_failed",message:ce.message}},{status:400,headers:{"x-request-id":requestId}});
+      call=created;
+    }
+  }
 
   if(input.consentimento!==undefined){
-    await supabase.from("consent_logs").insert({
-      user_id:user.id,operator_id:operator.id,lead_id:input.lead_id,
-      consent_type:input.consentimento_tipo||"contato",
-      granted:input.consentimento,source:"call_api",request_id:requestId
-    });
+    await supabase.from("consent_logs").insert({user_id:user.id,operator_id:operator.id,lead_id:input.lead_id,consent_type:input.consentimento_tipo||"contato",granted:input.consentimento,source:"call_api",request_id:requestId});
   }
   await supabase.from("audit_logs").insert({
-    actor_user_id:user.id,operator_id:operator.id,action:"call.created",
+    actor_user_id:user.id,operator_id:operator.id,action:input.action==="start"?"call.started":"call.finished",
     resource:"ligacoes",resource_id:call.id,request_id:requestId,
-    metadata:{resultado:input.resultado,lead_id:input.lead_id}
+    metadata:{resultado:call.resultado,lead_id:input.lead_id,duracao_segundos:call.duracao_segundos||0,gravacao_url:input.gravacao_url||null,tabulacao:input.tabulacao||{}}
   });
 
   return NextResponse.json({data:call},{status:201,headers:{"x-request-id":requestId,"cache-control":"no-store"}});
