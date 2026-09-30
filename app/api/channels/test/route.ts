@@ -25,10 +25,16 @@ export async function POST(request: Request) {
     const body = await upstream.text();
     if (!upstream.ok) return NextResponse.json({ error: "O provedor respondeu HTTP " + upstream.status, detail: body.slice(0,500) }, { status: 502 });
     if(lead_id){
-      const {data:conversation}=await supabase.from("crm_conversas").upsert({lead_id,canal:channel,status:"aberta",responsavel_id:operator.id,ultima_mensagem_at:new Date().toISOString(),updated_at:new Date().toISOString()},{onConflict:"lead_id,canal"}).select("id").maybeSingle();
-      if(conversation?.id){
-        await supabase.from("crm_mensagens").insert({conversa_id:conversation.id,lead_id,operador_id:operator.id,direcao:"saida",conteudo:String(message||""),status:"enviada"});
+      let conversation:any=null;
+      const {data:existingConversation}=await supabase.from("crm_conversas").select("id").eq("lead_id",lead_id).eq("canal",channel).maybeSingle();
+      if(existingConversation?.id){
+        const {data:updatedConversation}=await supabase.from("crm_conversas").update({status:"aberta",responsavel_id:operator.id,ultima_mensagem_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",existingConversation.id).select("id").single();
+        conversation=updatedConversation;
+      }else{
+        const {data:newConversation}=await supabase.from("crm_conversas").insert({lead_id,canal:channel,status:"aberta",responsavel_id:operator.id,ultima_mensagem_at:new Date().toISOString(),updated_at:new Date().toISOString()}).select("id").single();
+        conversation=newConversation;
       }
+      if(conversation?.id) await supabase.from("crm_mensagens").insert({conversa_id:conversation.id,lead_id,operador_id:operator.id,direcao:"saida",conteudo:String(message||""),status:"enviada"});
     }
     return NextResponse.json({ ok:true, status:upstream.status, purpose:purpose||null, detail:body.slice(0,500) });
   } catch (error:any) {
