@@ -43,11 +43,6 @@ export async function POST(request:Request){
   if(!Number.isFinite(new Date(inicio).getTime())||!Number.isFinite(new Date(fim).getTime())){
     return NextResponse.json({error:{code:"invalid_datetime",message:"Data/hora inválida"}},{status:422,headers:{"x-request-id":requestId}});
   }
-  const hour=brasilHour(inicio);
-  if(hour<8||hour>21){
-    return NextResponse.json({error:{code:"calling_window_closed",message:"Chamadas permitidas somente das 08:00 às 21:00 (horário de Brasília)."}},{status:422,headers:{"x-request-id":requestId}});
-  }
-
   const {data:operator,error:oe}=await supabase.from("operadores").select("id,ativo").eq("auth_user_id",user.id).maybeSingle();
   if(oe||!operator?.ativo)return NextResponse.json({error:{code:"operator_not_allowed",message:"Operador ativo não encontrado."}},{status:403,headers:{"x-request-id":requestId}});
 
@@ -72,6 +67,8 @@ export async function POST(request:Request){
 
   let call:any=null;
   if(input.action==="start"){
+    const hour=brasilHour(inicio);
+    if(hour<8||hour>21)return NextResponse.json({error:{code:"calling_window_closed",message:"Chamadas permitidas somente das 08:00 às 21:00 (horário de Brasília)."}},{status:422,headers:{"x-request-id":requestId}});
     const {data:created,error:ce}=await supabase.from("ligacoes").insert({
       lead_id:input.lead_id,telefone_id:input.telefone_id||null,campanha_id:input.campanha_id||null,
       operador_id:operator.id,inicio,fim:null,resultado:"Em andamento",observacao:"Chamada iniciada pelo discador"
