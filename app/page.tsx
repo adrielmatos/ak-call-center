@@ -250,6 +250,8 @@ async function audit(acao:string,entidade?:string,entidade_id?:string,detalhes?:
 }
 async function callResult(result:string){
   if(!current)return;
+  const currentIndex=available.findIndex(l=>l.id===current.id);
+  const nextLeadId=available[currentIndex+1]?.id||available[0]?.id||"";
   const t=current.telefones?.[0],now=new Date().toISOString();
   try{
     const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"finish",lead_id:current.id,telefone_id:t?.id,resultado:result,tabulacao:{resultado:result},inicio:now,fim:now})});
@@ -258,11 +260,15 @@ async function callResult(result:string){
     const status=statusMap[result]||"finalizado";
     const{error:ue}=await supabase!.from("leads").update({status,updated_at:now,tentativas_contato:Number(current.tentativas_contato||0)+1}).eq("id",current.id);
     if(ue)throw ue;
-    await audit("ligacao_tabular","leads",current.id,{resultado:result,status});await load();
+    await audit("ligacao_tabular","leads",current.id,{resultado:result,status});
+    await load();
+    setCurrentLeadId(nextLeadId);
   }catch(e:any){setError(e?.message||"Não foi possível registrar a tabulação.");}
 }
 async function scheduleReturn(dateTime:string,observacao:string){
   if(!current||!dateTime)return;
+  const currentIndex=available.findIndex(l=>l.id===current.id);
+  const nextLeadId=available[currentIndex+1]?.id||available[0]?.id||"";
   const t=current.telefones?.[0],now=new Date().toISOString(),when=new Date(dateTime).toISOString();
   if(new Date(when).getTime()<=Date.now()){setError("Escolha uma data e hora futura para o retorno.");return}
   try{
@@ -270,16 +276,22 @@ async function scheduleReturn(dateTime:string,observacao:string){
     const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível registrar a ligação.");
     const{error:e}=await supabase!.from("retornos").insert({lead_id:current.id,operador_id:operator?.id,data_hora:when,observacao:observacao||null,concluido:false});if(e)throw e;
     const{error:ue}=await supabase!.from("leads").update({status:"retorno",agendamento_retorno:when,updated_at:now,tentativas_contato:Number(current.tentativas_contato||0)+1}).eq("id",current.id);if(ue)throw ue;
-    await audit("retorno_agendado","leads",current.id,{data_hora:when,observacao});await load();
+    await audit("retorno_agendado","leads",current.id,{data_hora:when,observacao});
+    await load();
+    setCurrentLeadId(nextLeadId);
   }catch(e:any){setError(e?.message||"Não foi possível agendar o retorno.");}
 }
 async function block(){
   if(!supabase||!current)return;
+  const currentIndex=available.findIndex(l=>l.id===current.id);
+  const nextLeadId=available[currentIndex+1]?.id||available[0]?.id||"";
   const tel=current.telefones?.[0]?.numero_normalizado||"";
   const{error:e}=await supabase.from("lista_nao_perturbe").insert({cpf:cpf(current.cpf||"")||null,telefone:phone(tel)||null,nome:current.nome,origem:"manual",motivo:"Solicitação de não contato",operador_id:operator?.id});
   if(e){setError(e.message);return}
   await supabase.from("leads").update({bloqueado:true,opt_out:true,status:"bloqueado",updated_at:new Date().toISOString()}).eq("id",current.id);
-  await audit("bloqueio_npd","leads",current.id);await load();
+  await audit("bloqueio_npd","leads",current.id);
+  await load();
+  setCurrentLeadId(nextLeadId);
  }
  async function moveLead(id:string,status:string){
   if(!supabase)return;
@@ -507,8 +519,7 @@ function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,scrip
  const[showReturn,setShowReturn]=useState(false),[calling,setCalling]=useState(false),[dateTime,setDateTime]=useState(()=>{const d=new Date(Date.now()+86400000);d.setHours(9,0,0,0);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}),[obs,setObs]=useState("");
  useEffect(()=>{setCalling(false)},[lead?.id]);
  const call=()=>{if(!lead)return;setCalling(true);onCall()};
- return <div className="stack">
-  <div className="panel"><div className="dialHeader"><span className="statusDot"/>Fila ativa <b>{available}</b><span style={{marginLeft:"auto"}}>Discagem automática • Phone Link</span></div></div>
+ return <div className="dialerPage">
   <div className="dialGrid">
    <section className="panel callPanel">
     {lead?<><div className="person"><div className="personAvatar">{initials(lead.nome)}</div><div><div className="eyebrow">CONTATO ATUAL</div><h2>{lead.nome}</h2><p>{lead.cidade||"Cidade não informada"} {lead.uf&&"• "+lead.uf}</p></div></div>
@@ -528,7 +539,7 @@ function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,scrip
    <section className="panel">
     <PanelTitle title="Script do discador" subtitle="Roteiro do produto do lead atual. Edite pelo Dashboard → Scripts de ligação."/>
     <div className="scriptCard"><div className="eyebrow">{lead?.produto||"CONSIGNADO"}</div><p>Cliente: <b>{lead?.nome||"—"}</b></p><p>☎ {lead?.telefones?.[0]?.numero_normalizado||"—"}</p>
-     <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.6,margin:0}}>{resolveScript(scripts,lead?.produto||"Atendimento").replaceAll("[NOME]",lead?.nome||"cliente").replaceAll("[SEU NOME]","Adriel")}</pre></div>
+     <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.6,margin:0}}>{fillScript(resolveScript(scripts,lead?.produto||"Atendimento"),lead,operator)}</pre></div>
      <div className="callActions"><button className="btn primary" onClick={()=>lead&&onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO VIA WHATSAPP</button></div>
     </div>
    </section>
