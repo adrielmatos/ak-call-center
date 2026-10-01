@@ -38,38 +38,9 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  const url = String(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  ).trim();
-
-  const key = String(
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-      "",
-  ).trim();
-
-  /**
-   * API protegida sem Supabase configurado deve falhar fechada.
-   * Nunca liberar a requisição apenas porque a configuração está ausente.
-   */
-  if (!url || !key) {
-    return NextResponse.json(
-      {
-        error: {
-          code: "supabase_not_configured",
-          message:
-            "Serviço de autenticação temporariamente indisponível.",
-        },
-      },
-      {
-        status: 503,
-        headers: {
-          "x-request-id": requestId,
-          "cache-control": "no-store",
-        },
-      },
-    );
-  }
+  // Authentication is enforced by each protected API route through
+  // lib/supabase/server.ts. The middleware only carries the request/cookie
+  // context and must never turn a missing build-time env into a global 503.
 
   const supabase = createServerClient(
     url,
