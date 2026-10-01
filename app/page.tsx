@@ -120,7 +120,7 @@ export default function Home(){
   return()=>{alive=false;data.subscription.unsubscribe()};
  },[]);
  useEffect(()=>{if(session)loadOperator()},[session]);
- useEffect(()=>{if(session)loadScripts()},[session,mode]);
+ useEffect(()=>{if(session)loadScripts()},[session]);
  useEffect(()=>setPage(1),[search]);
  useEffect(()=>{if(session)load(mode)},[mode]);
  useEffect(()=>{
@@ -141,7 +141,7 @@ export default function Home(){
     }
   };
   void checkReturns();
-  const timer=window.setInterval(checkReturns,1000);
+  const timer=window.setInterval(checkReturns,30000);
   return()=>{stopped=true;window.clearInterval(timer)};
  },[session]);
 
@@ -179,20 +179,26 @@ export default function Home(){
 }
   async function loadOperator(){
   if(!supabase||!session?.user?.id)return;
+  // Load only the operator needed to render the shell first. Secondary settings
+  // and the admin user list are intentionally deferred so login is not held
+  // behind extra database requests.
   const{data,error}=await supabase.from("operadores").select("*").eq("auth_user_id",session.user.id).maybeSingle();
   if(error){setError(error.message);return}
   setOperator(data);
   if(!data)return;
-  const [cc,dc]=await Promise.all([
+  setUsers([data as UserRow]);
+  void Promise.all([
     supabase.from("configuracoes_canais").select("*").eq("operador_id",data.id).maybeSingle(),
     supabase.from("configuracoes_discador").select("*").eq("operador_id",data.id).maybeSingle()
-  ]);
-  if(cc.error)setError(cc.error.message);else setChannelConfig(cc.data);
-  if(dc.error)setError(dc.error.message);else setDialerConfig(dc.data);
+  ]).then(([cc,dc])=>{
+    if(cc.error)setError(cc.error.message);else setChannelConfig(cc.data);
+    if(dc.error)setError(dc.error.message);else setDialerConfig(dc.data);
+  });
   if(data.perfil==="admin"){
-    const{data:all,error:ue}=await supabase.from("operadores").select("*").order("created_at",{ascending:true});
-    if(ue)setError(ue.message);else setUsers((all||[]) as UserRow[]);
-  }else setUsers([data as UserRow]);
+    void supabase.from("operadores").select("*").order("created_at",{ascending:true}).then(({data:all,error:ue})=>{
+      if(ue)setError(ue.message);else setUsers((all||[]) as UserRow[]);
+    });
+  }
 }
 async function loadScripts(){
   if(!supabase)return;
