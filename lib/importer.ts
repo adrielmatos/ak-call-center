@@ -13,6 +13,18 @@ export const cpf = (v:any) => digits(v);
 
 const norm = (v:any) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
+const repairMojibake = (value:any) => {
+  const s = String(value ?? "");
+  if (!/[ÃÂâð�]/.test(s)) return s;
+  try {
+    const bytes = Uint8Array.from(s, ch => ch.charCodeAt(0) & 0xff);
+    const repaired = new TextDecoder("utf-8").decode(bytes);
+    return repaired.includes("�") ? s : repaired;
+  } catch {
+    return s;
+  }
+};
+
 const aliases:any = {
   nome:["nome","cliente","beneficiario","beneficiário","name"],
   cpf:["cpf","documento"],
@@ -62,10 +74,10 @@ export async function parseFile(file:File){
     // Preserva TODAS as colunas originais da planilha. Campos conhecidos continuam
     // normalizados para o fluxo operacional, enquanto nenhum campo desconhecido é perdido.
     const extras:any = Object.fromEntries(
-      Object.entries(r).map(([key,value]) => [key, serializeExtraValue(value)])
+      Object.entries(r).map(([key,value]) => [key, repairMojibake(serializeExtraValue(value))])
     );
-    const banco = map.banco ? String(r[map.banco] ?? "").trim() : "";
-    const produtoBase = map.produto ? String(r[map.produto] ?? "").trim() : "";
+    const banco = map.banco ? repairMojibake(String(r[map.banco] ?? "").trim()) : "";
+    const produtoBase = map.produto ? repairMojibake(String(r[map.produto] ?? "").trim()) : "";
     const produto = [produtoBase, banco ? "Banco: " + banco : ""].filter(Boolean).join(" • ");
 
     // Metadados do importador ficam em chaves próprias sem apagar os valores originais.
@@ -77,15 +89,15 @@ export async function parseFile(file:File){
     };
 
     return {
-      nome: map.nome ? String(r[map.nome] ?? "").trim() : "",
+      nome: map.nome ? repairMojibake(String(r[map.nome] ?? "").trim()) : "",
       cpf: cpf(map.cpf ? r[map.cpf] : ""),
       telefone: phone(map.telefone ? r[map.telefone] : ""),
       telefone2: phone(map.telefone2 ? r[map.telefone2] : ""),
-      cidade: map.cidade ? String(r[map.cidade] ?? "").trim() : "",
+      cidade: map.cidade ? repairMojibake(String(r[map.cidade] ?? "").trim()) : "",
       uf: map.uf ? String(r[map.uf] ?? "").trim().toUpperCase() : "",
       banco,
       produto,
-      observacao: map.observacao ? String(r[map.observacao] ?? "").trim() : "",
+      observacao: map.observacao ? repairMojibake(String(r[map.observacao] ?? "").trim()) : "",
       extras
     };
   });
