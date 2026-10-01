@@ -215,7 +215,7 @@ async function audit(acao:string,entidade?:string,entidade_id?:string,detalhes?:
   const r=signup?await supabase.auth.signUp({email,password,options:{data:{nome},emailRedirectTo:window.location.origin}}):await supabase.auth.signInWithPassword({email,password});
   if(r.error){setError(r.error.message);return}
   if(signup&&!r.data.session){setMsg("Cadastro criado. Confirme seu e-mail para liberar o primeiro acesso. Se o e-mail não chegar, confira Spam/Lixo eletrônico.");return}
-  setMsg("Acesso autorizado.");setSession(r.data.session);
+  setMsg("");setSession(r.data.session);
  }
  async function resetPassword(email:string){
   if(!supabase||!email){setError("Informe seu e-mail.");return}
@@ -260,9 +260,9 @@ async function callResult(result:string){
     const status=statusMap[result]||"finalizado";
     const{error:ue}=await supabase!.from("leads").update({status,updated_at:now,tentativas_contato:Number(current.tentativas_contato||0)+1}).eq("id",current.id);
     if(ue)throw ue;
-    await audit("ligacao_tabular","leads",current.id,{resultado:result,status});
-    await load();
     setCurrentLeadId(nextLeadId);
+    void audit("ligacao_tabular","leads",current.id,{resultado:result,status});
+    void load("dashboard");
   }catch(e:any){setError(e?.message||"Não foi possível registrar a tabulação.");}
 }
 async function scheduleReturn(dateTime:string,observacao:string){
@@ -276,9 +276,9 @@ async function scheduleReturn(dateTime:string,observacao:string){
     const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível registrar a ligação.");
     const{error:e}=await supabase!.from("retornos").insert({lead_id:current.id,operador_id:operator?.id,data_hora:when,observacao:observacao||null,concluido:false});if(e)throw e;
     const{error:ue}=await supabase!.from("leads").update({status:"retorno",agendamento_retorno:when,updated_at:now,tentativas_contato:Number(current.tentativas_contato||0)+1}).eq("id",current.id);if(ue)throw ue;
-    await audit("retorno_agendado","leads",current.id,{data_hora:when,observacao});
-    await load();
     setCurrentLeadId(nextLeadId);
+    void audit("retorno_agendado","leads",current.id,{data_hora:when,observacao});
+    void load("dashboard");
   }catch(e:any){setError(e?.message||"Não foi possível agendar o retorno.");}
 }
 async function block(){
@@ -289,9 +289,9 @@ async function block(){
   const{error:e}=await supabase.from("lista_nao_perturbe").insert({cpf:cpf(current.cpf||"")||null,telefone:phone(tel)||null,nome:current.nome,origem:"manual",motivo:"Solicitação de não contato",operador_id:operator?.id});
   if(e){setError(e.message);return}
   await supabase.from("leads").update({bloqueado:true,opt_out:true,status:"bloqueado",updated_at:new Date().toISOString()}).eq("id",current.id);
-  await audit("bloqueio_npd","leads",current.id);
-  await load();
   setCurrentLeadId(nextLeadId);
+  void audit("bloqueio_npd","leads",current.id);
+  void load("dashboard");
  }
  async function moveLead(id:string,status:string){
   if(!supabase)return;
@@ -534,7 +534,6 @@ function Dialer({lead,onCall,onResult,onReturn,onBlock,onChannel,scripts,operato
   <div className="dialGrid">
    <section className="panel callPanel">
     {lead?<><div className="person"><div className="personAvatar">{initials(lead.nome)}</div><div><div className="eyebrow">CONTATO ATUAL</div><h2>{lead.nome}</h2><p>{lead.cidade||"Cidade não informada"} {lead.uf&&"• "+lead.uf}</p></div></div>
-     <div className="dialBankLine">🏛️ {bankName}</div>
      <div className="dialNumber">☎ {lead.telefones?.[0]?.numero_normalizado||"Sem telefone"}</div>
      <div className="leadMetaGrid">
       <div className="panelSubtle"><span>Banco</span><b>{bankName}</b></div>
