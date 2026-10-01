@@ -204,3 +204,6 @@
  .dialerPage .dialerActions .btn{font-size:10px}
  .dialerPage .tabulationPanel .resultGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* Garantia: a faixa antiga da fila não ocupa espaço na Discadora. */
+.dialerPage .dialQueueBar{display:none!important}
