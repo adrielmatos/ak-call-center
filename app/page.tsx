@@ -420,7 +420,7 @@ async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,
    {mode!=="discador"&&error&&<div className="alert error"><b>Erro:</b> {error}<button onClick={()=>setError("")}>×</button></div>}
    {mode!=="discador"&&msg&&<div className="alert success">{msg}<button onClick={()=>setMsg("")}>×</button></div>}
    {mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length} campaigns={campaigns.length} returns={returns} calls={calls} loading={loading} dialerConfig={dialerConfig} onSaveDialer={saveDialer}/>}
-   {mode==="discador"&&<Dialer lead={current} available={available.length} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>callResult(r)} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} scripts={scripts} operator={operator}/>} 
+   {mode==="discador"&&<Dialer lead={current} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>callResult(r)} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} scripts={scripts} operator={operator}/>} 
    {mode==="crm"&&<DeskCRM leads={leads} stages={stages} onMove={moveLead} onOpen={setSelectedLead} onChannel={sendChannel} operator={operator}/>}   {mode==="resultados"&&<OperationalResults leads={leads} onOpen={setSelectedLead}/>}
    {mode==="leads"&&<Leads leads={paged} loading={loading} search={search} setSearch={setSearch} page={page} setPage={setPage} total={filtered.length} pageSize={pageSize} onOpen={setSelectedLead}/>}
    {mode==="campanhas"&&<Campaigns rows={campaigns} onCreate={createCampaign} onToggle={toggleCampaign} onDelete={deleteCampaign}/>}
@@ -515,36 +515,44 @@ function ScriptManager({scripts,onSave,canEdit}:{scripts:CallScript[];onSave:(da
 function Metric({title,value,icon,hint}:{title:string;value:number;icon:string;hint:string}){return <div className="panel metric"><div className="metricIcon">{icon}</div><div><span>{title}</span><strong>{value}</strong><small>{hint}</small></div></div>}
 function PanelTitle({title,subtitle}:{title:string;subtitle:string}){return <div className="panelTitle"><div><h3>{title}</h3><p>{subtitle}</p></div></div>}
 
-function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,scripts,operator}:{lead?:Lead;available:number;onCall:()=>void;onResult:(r:string)=>void;onReturn:(dateTime:string,observacao:string)=>void;onBlock:()=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;scripts:CallScript[];operator?:any}){
+function Dialer({lead,onCall,onResult,onReturn,onBlock,onChannel,scripts,operator}:{lead?:Lead;onCall:()=>void;onResult:(r:string)=>void;onReturn:(dateTime:string,observacao:string)=>void;onBlock:()=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;scripts:CallScript[];operator?:any}){
  const[showReturn,setShowReturn]=useState(false),[calling,setCalling]=useState(false),[dateTime,setDateTime]=useState(()=>{const d=new Date(Date.now()+86400000);d.setHours(9,0,0,0);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}),[obs,setObs]=useState("");
  useEffect(()=>{setCalling(false)},[lead?.id]);
  const call=()=>{if(!lead)return;setCalling(true);onCall()};
+ const bankName=String(lead?.dados_extras?._importacao?.banco||lead?.dados_extras?.banco||lead?.dados_extras?.Banco||"Banco não informado").trim()||"Banco não informado";
+ const productName=String(lead?.dados_extras?._importacao?.produto_original||lead?.produto||"Não informado").replace(/\s*•\s*Banco:\s*.+$/i,"").trim()||"Não informado";
  return <div className="dialerPage">
   <div className="dialGrid">
    <section className="panel callPanel">
     {lead?<><div className="person"><div className="personAvatar">{initials(lead.nome)}</div><div><div className="eyebrow">CONTATO ATUAL</div><h2>{lead.nome}</h2><p>{lead.cidade||"Cidade não informada"} {lead.uf&&"• "+lead.uf}</p></div></div>
+     <div className="dialBankLine">🏛️ {bankName}</div>
      <div className="dialNumber">☎ {lead.telefones?.[0]?.numero_normalizado||"Sem telefone"}</div>
-      <div className="leadMetaGrid" style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12,margin:"16px 0"}}><div className="panelSubtle"><span>Banco</span><b>{String(lead.dados_extras?._importacao?.banco||lead.dados_extras?.banco||"Banco não informado")}</b></div><div className="panelSubtle"><span>Benefício / produto</span><b>{String(lead.dados_extras?._importacao?.produto_original||lead.produto||"Não informado")}</b></div><div className="panelSubtle"><span>Valor / margem</span><b>{lead.margem_disponivel!=null?Number(lead.margem_disponivel).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Não informado"}</b></div></div>
-     <div className="callActions">
+     <div className="leadMetaGrid">
+      <div className="panelSubtle"><span>Banco</span><b>{bankName}</b></div>
+      <div className="panelSubtle"><span>Benefício / produto</span><b>{productName}</b></div>
+     </div>
+     <div className="dialPrimaryActions">
       <button className="btn callBtn" disabled={!lead.telefones?.[0]} onClick={call}>{calling?"☎ CHAMANDO CLIENTE":"☎ LIGAR PELO TELEFONE"}</button>
       <button className="btn dangerBtn" onClick={()=>{setCalling(false);onResult("Não atendeu")}}>■ ENCERRAR LIGAÇÃO</button>
-      {whatsappHref(lead.telefones?.[0]?.numero_normalizado)&&<a className="btn" href={whatsappHref(lead.telefones?.[0]?.numero_normalizado)} target="_blank" rel="noreferrer">◉ WHATSAPP</a>}
       <button className="btn" onClick={()=>setShowReturn(true)}>◷ AGENDAR RETORNO</button>
-      <button className="btn" onClick={()=>onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO</button>
       <button className="btn dangerBtn" onClick={onBlock}>⊘ NÃO LIGAR MAIS</button>
      </div>
-     <div className="info">Ao clicar em <b>Ligar pelo telefone</b>, o navegador abre o discador do aparelho/Windows e o Microsoft Phone Link pode assumir a chamada. O sistema não usa API proprietária do Phone Link.</div>
     </>:<Empty title="Fila vazia" text="Importe uma lista para iniciar a operação."/>}
    </section>
-   <section className="panel">
+   <section className="panel scriptPanel">
     <PanelTitle title="Script do discador" subtitle="Roteiro do produto do lead atual. Edite pelo Dashboard → Scripts de ligação."/>
-    <div className="scriptCard"><div className="eyebrow">{lead?.produto||"CONSIGNADO"}</div><p>Cliente: <b>{lead?.nome||"—"}</b></p><p>☎ {lead?.telefones?.[0]?.numero_normalizado||"—"}</p>
+    <div className="scriptCard">
+     <div className="eyebrow">{productName}</div>
+     <p>Cliente: <b>{lead?.nome||"—"}</b></p>
      <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.6,margin:0}}>{fillScript(resolveScript(scripts,lead?.produto||"Atendimento"),lead,operator)}</pre></div>
-     <div className="callActions"><button className="btn primary" onClick={()=>lead&&onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO VIA WHATSAPP</button></div>
+     <div className="callActions"><button className="btn primary full" onClick={()=>lead&&onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO VIA WHATSAPP</button></div>
     </div>
    </section>
   </div>
-  <section className="panel"><PanelTitle title="Tabulação da ligação" subtitle="Escolha o resultado. O lead atual será encerrado e o próximo será carregado automaticamente."/><div className="resultGrid">{results.map(r=><button key={r} onClick={()=>r==="Retorno"?setShowReturn(true):onResult(r)}>{r}</button>)}</div></section>
+  <section className="panel tabulationPanel">
+   <PanelTitle title="Tabulação da ligação" subtitle="Escolha o resultado. O lead atual será encerrado e o próximo será carregado automaticamente."/>
+   <div className="resultGrid">{results.map(r=><button key={r} onClick={()=>r==="Retorno"?setShowReturn(true):onResult(r)}>{r}</button>)}</div>
+  </section>
   {showReturn&&<div className="modal" onClick={()=>setShowReturn(false)}><div className="modalBox smallModal" onClick={e=>e.stopPropagation()}><div className="toolbar"><div><div className="eyebrow">RETORNO</div><h2>Agendar retorno</h2><p>{lead?.nome}</p></div><button className="btn" onClick={()=>setShowReturn(false)}>Fechar</button></div><div className="field"><label htmlFor="ak-field-07">Data e hora</label><input id="ak-field-07" type="datetime-local" value={dateTime} min={new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)} onChange={e=>setDateTime(e.target.value)}/></div><div className="field"><label htmlFor="ak-field-08">Observação</label><textarea id="ak-field-08" className="textarea" value={obs} onChange={e=>setObs(e.target.value)} placeholder="Ex.: retornar após 15h, enviar simulação..."/></div><button className="btn primary full big" onClick={()=>{onReturn(dateTime,obs);setShowReturn(false);setObs("")}}>Salvar e próximo lead</button></div></div>}
  </div>;
 }
