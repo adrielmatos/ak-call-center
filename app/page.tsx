@@ -515,7 +515,7 @@ function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,scrip
      <div className="dialNumber">☎ {lead.telefones?.[0]?.numero_normalizado||"Sem telefone"}</div>
       <div className="leadMetaGrid" style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12,margin:"16px 0"}}><div className="panelSubtle"><span>Banco</span><b>{String(lead.dados_extras?._importacao?.banco||lead.dados_extras?.banco||"Banco não informado")}</b></div><div className="panelSubtle"><span>Benefício / produto</span><b>{String(lead.dados_extras?._importacao?.produto_original||lead.produto||"Não informado")}</b></div><div className="panelSubtle"><span>Valor / margem</span><b>{lead.margem_disponivel!=null?Number(lead.margem_disponivel).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Não informado"}</b></div></div>
      <div className="callActions">
-      <button className="btn callBtn" disabled={paused||!lead.telefones?.[0]} onClick={call}>{calling?"☎ CHAMANDO CLIENTE":"☎ LIGAR PELO TELEFONE"}</button>
+      <button className="btn callBtn" disabled={!lead.telefones?.[0]} onClick={call}>{calling?"☎ CHAMANDO CLIENTE":"☎ LIGAR PELO TELEFONE"}</button>
       <button className="btn dangerBtn" onClick={()=>{setCalling(false);onResult("Não atendeu")}}>■ ENCERRAR LIGAÇÃO</button>
       {whatsappHref(lead.telefones?.[0]?.numero_normalizado)&&<a className="btn" href={whatsappHref(lead.telefones?.[0]?.numero_normalizado)} target="_blank" rel="noreferrer">◉ WHATSAPP</a>}
       <button className="btn" onClick={()=>setShowReturn(true)}>◷ AGENDAR RETORNO</button>
@@ -528,7 +528,7 @@ function Dialer({lead,available,onCall,onResult,onReturn,onBlock,onChannel,scrip
    <section className="panel">
     <PanelTitle title="Script do discador" subtitle="Roteiro do produto do lead atual. Edite pelo Dashboard → Scripts de ligação."/>
     <div className="scriptCard"><div className="eyebrow">{lead?.produto||"CONSIGNADO"}</div><p>Cliente: <b>{lead?.nome||"—"}</b></p><p>☎ {lead?.telefones?.[0]?.numero_normalizado||"—"}</p>
-     <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.6,margin:0}}>{resolveScript(dialerConfig,lead?.produto||"Atendimento").replaceAll("[NOME]",lead?.nome||"cliente").replaceAll("[SEU NOME]","Adriel")}</pre></div>
+     <div className="scriptBlock"><pre style={{whiteSpace:"pre-wrap",font:"inherit",lineHeight:1.6,margin:0}}>{resolveScript(scripts,lead?.produto||"Atendimento").replaceAll("[NOME]",lead?.nome||"cliente").replaceAll("[SEU NOME]","Adriel")}</pre></div>
      <div className="callActions"><button className="btn primary" onClick={()=>lead&&onChannel("whatsapp",lead)}>💬 ENVIAR SIMULAÇÃO VIA WHATSAPP</button></div>
     </div>
    </section>
