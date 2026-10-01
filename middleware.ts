@@ -42,6 +42,20 @@ export async function middleware(request: NextRequest) {
   // lib/supabase/server.ts. The middleware only carries the request/cookie
   // context and must never turn a missing build-time env into a global 503.
 
+  const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+  const key = String(
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      "",
+  ).trim();
+
+  if (!url || !key) {
+    return NextResponse.json(
+      { error: { code: "supabase_not_configured", message: "Supabase público não está configurado." } },
+      { status: 503, headers: { "x-request-id": requestId, "cache-control": "no-store" } },
+    );
+  }
+
   const supabase = createServerClient(
     url,
     key,
