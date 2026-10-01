@@ -530,7 +530,7 @@ function Dialer({lead,onCall,onResult,onReturn,onBlock,onChannel,scripts,operato
  const bankName=repairMojibake(String(lead?.dados_extras?._importacao?.banco||lead?.dados_extras?.banco||lead?.dados_extras?.Banco||"Banco não informado").trim())||"Banco não informado";
  const productName=repairMojibake(String(lead?.dados_extras?._importacao?.produto_original||lead?.produto||"Não informado").replace(/\s*•\s*Banco:\s*.+$/i,"").trim())||"Não informado";
  return <div className="dialerPage">
-  {(error||msg)&&<div className={error?"alert error":"alert success"} role="alert"><b>{error?"Erro:":"Status:"}</b> {error||msg}<button className="btn" type="button" onClick={()=>{}} aria-label="Mensagem do discador">×</button></div>}
+  {(error||msg)&&<div className={error?"alert error":"alert success"} role="alert"><b>{error?"Erro:":"Status:"}</b> {error||msg}</div>}
   <div className="dialGrid">
    <section className="panel callPanel">
     {lead?<><div className="person"><div className="personAvatar">{initials(lead.nome)}</div><div><div className="eyebrow">CONTATO ATUAL</div><h2>{lead.nome}</h2><p>{lead.cidade||"Cidade não informada"} {lead.uf&&"• "+lead.uf}</p></div></div>
