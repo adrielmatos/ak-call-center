@@ -207,3 +207,6 @@
 
 /* Garantia: a faixa antiga da fila não ocupa espaço na Discadora. */
 .dialerPage .dialQueueBar{display:none!important}
+
+/* Oculta a faixa legada da fila independentemente do wrapper usado pela versão antiga. */
+.dialQueueBar,.dialAutoStatus{display:none!important}
