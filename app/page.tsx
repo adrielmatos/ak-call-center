@@ -519,8 +519,16 @@ function Dialer({lead,onCall,onResult,onReturn,onBlock,onChannel,scripts,operato
  const[showReturn,setShowReturn]=useState(false),[calling,setCalling]=useState(false),[dateTime,setDateTime]=useState(()=>{const d=new Date(Date.now()+86400000);d.setHours(9,0,0,0);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}),[obs,setObs]=useState("");
  useEffect(()=>{setCalling(false)},[lead?.id]);
  const call=()=>{if(!lead)return;setCalling(true);onCall()};
- const bankName=String(lead?.dados_extras?._importacao?.banco||lead?.dados_extras?.banco||lead?.dados_extras?.Banco||"Banco não informado").trim()||"Banco não informado";
- const productName=String(lead?.dados_extras?._importacao?.produto_original||lead?.produto||"Não informado").replace(/\s*•\s*Banco:\s*.+$/i,"").trim()||"Não informado";
+ const repairMojibake=(value:string)=>{
+  if(!/[ÃÂâð�]/.test(value))return value;
+  try{
+   const bytes=Uint8Array.from(value,ch=>ch.charCodeAt(0)&255);
+   const repaired=new TextDecoder("utf-8").decode(bytes);
+   return repaired.includes("�")?value:repaired;
+  }catch{return value}
+ };
+ const bankName=repairMojibake(String(lead?.dados_extras?._importacao?.banco||lead?.dados_extras?.banco||lead?.dados_extras?.Banco||"Banco não informado").trim())||"Banco não informado";
+ const productName=repairMojibake(String(lead?.dados_extras?._importacao?.produto_original||lead?.produto||"Não informado").replace(/\s*•\s*Banco:\s*.+$/i,"").trim())||"Não informado";
  return <div className="dialerPage">
   <div className="dialGrid">
    <section className="panel callPanel">
