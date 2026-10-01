@@ -210,3 +210,131 @@
 
 /* Oculta a faixa legada da fila independentemente do wrapper usado pela versão antiga. */
 .dialQueueBar,.dialAutoStatus{display:none!important}
+
+
+/* Discador — remodelação final: nada do conteúdo operacional fica escondido. */
+.dialerPage{
+ width:100%;
+ height:auto;
+ min-height:0;
+}
+.dialerPage .dialGrid{
+ width:100%;
+ height:auto;
+ min-height:0;
+ grid-template-columns:minmax(0,1.08fr) minmax(420px,.92fr);
+ align-items:stretch;
+ gap:14px;
+}
+.dialerPage .callPanel{
+ min-height:0;
+ padding:20px;
+ display:flex;
+ flex-direction:column;
+}
+.dialerPage .person{
+ margin-top:0;
+}
+.dialerPage .dialBankLine{
+ color:#e4efff;
+ font-size:15px;
+ font-weight:800;
+ margin-top:9px;
+}
+.dialerPage .dialNumber{
+ margin:13px 0 5px;
+ font-size:22px;
+ letter-spacing:.2px;
+}
+.dialerPage .leadMetaGrid{
+ display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:10px;
+ margin:12px 0 14px;
+}
+.dialerPage .leadMetaGrid .panelSubtle{
+ margin-top:0;
+ min-width:0;
+ background:#ffffff12;
+ border-color:#ffffff2c;
+ color:#fff;
+}
+.dialerPage .leadMetaGrid .panelSubtle>span{
+ color:#bdd2eb;
+}
+.dialerPage .leadMetaGrid .panelSubtle b{
+ color:#fff;
+ font-size:13px;
+}
+.dialerPage .dialPrimaryActions{
+ display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:8px;
+ margin-top:2px;
+}
+.dialerPage .dialPrimaryActions .btn{
+ width:100%;
+ min-height:46px;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ text-align:center;
+ padding:10px 9px;
+ font-size:12px;
+ line-height:1.2;
+}
+.dialerPage .scriptPanel{
+ height:auto;
+ min-height:0;
+ padding:20px;
+ display:flex;
+ flex-direction:column;
+ overflow:visible;
+}
+.dialerPage .scriptPanel .scriptCard{
+ min-height:0;
+ display:flex;
+ flex-direction:column;
+ flex:1;
+}
+.dialerPage .scriptPanel .scriptBlock{
+ max-height:none;
+ flex:initial;
+ overflow:visible;
+ font-size:13px;
+ line-height:1.65;
+}
+.dialerPage .scriptPanel .callActions{
+ margin-top:14px;
+}
+.dialerPage .tabulationPanel{
+ height:auto;
+ min-height:0;
+ padding:16px;
+ overflow:visible;
+}
+.dialerPage .tabulationPanel .resultGrid{
+ height:auto;
+ grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:8px;
+}
+.dialerPage .tabulationPanel .resultGrid button{
+ width:100%;
+ min-height:48px;
+ padding:11px 8px;
+ font-size:12px;
+}
+@media(max-width:1200px){
+ .dialerPage .dialGrid{grid-template-columns:1fr}
+ .dialerPage .scriptPanel{order:2}
+ .dialerPage .callPanel{order:1}
+ .dialerPage .tabulationPanel{order:3}
+}
+@media(max-width:760px){
+ .dialerPage .person h2{font-size:22px}
+ .dialerPage .dialNumber{font-size:18px}
+ .dialerPage .leadMetaGrid{grid-template-columns:1fr 1fr}
+ .dialerPage .dialPrimaryActions{grid-template-columns:1fr 1fr}
+ .dialerPage .tabulationPanel .resultGrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .dialerPage .tabulationPanel .resultGrid button{font-size:10px;padding:10px 4px}
+}
