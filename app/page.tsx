@@ -256,48 +256,83 @@ async function audit(acao:string,entidade?:string,entidade_id?:string,detalhes?:
 }
 async function callResult(result:string){
   if(!current)return;
-  const currentIndex=available.findIndex(l=>l.id===current.id);
+  const currentId=current.id;
+  const currentIndex=available.findIndex(l=>l.id===currentId);
   const nextLeadId=available[currentIndex+1]?.id||available[0]?.id||"";
   const t=current.telefones?.[0],now=new Date().toISOString();
-  try{
-    const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"finish",lead_id:current.id,telefone_id:t?.id,resultado:result,tabulacao:{resultado:result},inicio:now,fim:now})});
-    const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível registrar a ligação.");
-    const statusMap:Record<string,string>={"Número inválido":"numero_invalido","Sem perfil":"sem_perfil","Não interessado":"nao_interessado","Não atendeu":"nao_atendeu","Interessado":"interessado","Simulação":"simulação","Proposta":"proposta","Contrato":"contrato"};
-    const status=statusMap[result]||"finalizado";
-    const{error:ue}=await supabase!.from("leads").update({status,updated_at:now,tentativas_contato:Number(current.tentativas_contato||0)+1}).eq("id",current.id);
-    if(ue)throw ue;
-    setCurrentLeadId(nextLeadId);
-    void audit("ligacao_tabular","leads",current.id,{resultado:result,status});
-    void load("dashboard");
-  }catch(e:any){setError(e?.message||"Não foi possível registrar a tabulação.");}
+  const statusMap:Record<string,string>={"Número inválido":"numero_invalido","Sem perfil":"sem_perfil","Não interessado":"nao_interessado","Não atendeu":"nao_atendeu","Interessado":"interessado","Simulação":"simulação","Proposta":"proposta","Contrato":"contrato"};
+  const status=statusMap[result]||"finalizado";
+
+  // Avanço otimista: a fila não espera API, auditoria ou recarga do dashboard.
+  setCurrentLeadId(nextLeadId);
+  setLeads(prev=>prev.map(l=>l.id===currentId?{...l,status,tentativas_contato:Number(l.tentativas_contato||0)+1,updated_at:now}:l));
+  setError("");
+
+  void (async()=>{
+    try{
+      const [callResponse,leadUpdate]=await Promise.all([
+        fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"finish",lead_id:currentId,telefone_id:t?.id,resultado:result,tabulacao:{resultado:result},inicio:now,fim:now})}),
+        supabase!.from("leads").update({status,updated_at:now,tentativas_contato:Number(current.tentativas_contato||0)+1}).eq("id",currentId)
+      ]);
+      const body=await callResponse.json().catch(()=>({}));
+      if(!callResponse.ok)throw new Error(body?.error?.message||"Não foi possível registrar a ligação.");
+      if(leadUpdate.error)throw leadUpdate.error;
+      void audit("ligacao_tabular","leads",currentId,{resultado:result,status});
+    }catch(e:any){
+      setError(e?.message||"Não foi possível registrar a tabulação.");
+    }
+  })();
 }
 async function scheduleReturn(dateTime:string,observacao:string){
   if(!current||!dateTime)return;
-  const currentIndex=available.findIndex(l=>l.id===current.id);
+  const currentId=current.id;
+  const currentIndex=available.findIndex(l=>l.id===currentId);
   const nextLeadId=available[currentIndex+1]?.id||available[0]?.id||"";
   const t=current.telefones?.[0],now=new Date().toISOString(),when=new Date(dateTime).toISOString();
   if(new Date(when).getTime()<=Date.now()){setError("Escolha uma data e hora futura para o retorno.");return}
-  try{
-    const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"finish",lead_id:current.id,telefone_id:t?.id,resultado:"Retorno",tabulacao:{resultado:"Retorno",agendamento:when,observacao:observacao||""},observacao:observacao||"",inicio:now,fim:now})});
-    const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível registrar a ligação.");
-    const{error:e}=await supabase!.from("retornos").insert({lead_id:current.id,operador_id:operator?.id,data_hora:when,observacao:observacao||null,concluido:false});if(e)throw e;
-    const{error:ue}=await supabase!.from("leads").update({status:"retorno",agendamento_retorno:when,updated_at:now,tentativas_contato:Number(current.tentativas_contato||0)+1}).eq("id",current.id);if(ue)throw ue;
-    setCurrentLeadId(nextLeadId);
-    void audit("retorno_agendado","leads",current.id,{data_hora:when,observacao});
-    void load("dashboard");
-  }catch(e:any){setError(e?.message||"Não foi possível agendar o retorno.");}
+
+  setCurrentLeadId(nextLeadId);
+  setLeads(prev=>prev.map(l=>l.id===currentId?{...l,status:"retorno",agendamento_retorno:when,tentativas_contato:Number(l.tentativas_contato||0)+1,updated_at:now}:l));
+  setError("");
+
+  void (async()=>{
+    try{
+      const [callResponse,returnInsert,leadUpdate]=await Promise.all([
+        fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"finish",lead_id:currentId,telefone_id:t?.id,resultado:"Retorno",tabulacao:{resultado:"Retorno",agendamento:when,observacao:observacao||""},observacao:observacao||"",inicio:now,fim:now})}),
+        supabase!.from("retornos").insert({lead_id:currentId,operador_id:operator?.id,data_hora:when,observacao:observacao||null,concluido:false}),
+        supabase!.from("leads").update({status:"retorno",agendamento_retorno:when,updated_at:now,tentativas_contato:Number(current.tentativas_contato||0)+1}).eq("id",currentId)
+      ]);
+      const body=await callResponse.json().catch(()=>({}));
+      if(!callResponse.ok)throw new Error(body?.error?.message||"Não foi possível registrar a ligação.");
+      if(returnInsert.error)throw returnInsert.error;
+      if(leadUpdate.error)throw leadUpdate.error;
+      void audit("retorno_agendado","leads",currentId,{data_hora:when,observacao});
+    }catch(e:any){setError(e?.message||"Não foi possível agendar o retorno.");}
+  })();
 }
 async function block(){
   if(!supabase||!current)return;
-  const currentIndex=available.findIndex(l=>l.id===current.id);
+  const currentId=current.id;
+  const currentIndex=available.findIndex(l=>l.id===currentId);
   const nextLeadId=available[currentIndex+1]?.id||available[0]?.id||"";
   const tel=current.telefones?.[0]?.numero_normalizado||"";
-  const{error:e}=await supabase.from("lista_nao_perturbe").insert({cpf:cpf(current.cpf||"")||null,telefone:phone(tel)||null,nome:current.nome,origem:"manual",motivo:"Solicitação de não contato",operador_id:operator?.id});
-  if(e){setError(e.message);return}
-  await supabase.from("leads").update({bloqueado:true,opt_out:true,status:"bloqueado",updated_at:new Date().toISOString()}).eq("id",current.id);
+  const now=new Date().toISOString();
+
   setCurrentLeadId(nextLeadId);
-  void audit("bloqueio_npd","leads",current.id);
-  void load("dashboard");
+  setLeads(prev=>prev.map(l=>l.id===currentId?{...l,bloqueado:true,opt_out:true,status:"bloqueado",updated_at:now}:l));
+  setError("");
+
+  void (async()=>{
+    try{
+      const [npdInsert,leadUpdate]=await Promise.all([
+        supabase.from("lista_nao_perturbe").insert({cpf:cpf(current.cpf||"")||null,telefone:phone(tel)||null,nome:current.nome,origem:"manual",motivo:"Solicitação de não contato",operador_id:operator?.id}),
+        supabase.from("leads").update({bloqueado:true,opt_out:true,status:"bloqueado",updated_at:now}).eq("id",currentId)
+      ]);
+      if(npdInsert.error)throw npdInsert.error;
+      if(leadUpdate.error)throw leadUpdate.error;
+      void audit("bloqueio_npd","leads",currentId);
+    }catch(e:any){setError(e?.message||"Não foi possível bloquear o lead.");}
+  })();
  }
  async function moveLead(id:string,status:string){
   if(!supabase)return;
@@ -533,7 +568,15 @@ function Dialer({lead,onCall,onResult,onReturn,onBlock,onChannel,scripts,operato
    return repaired.includes("�")?value:repaired;
   }catch{return value}
  };
- const bankName=repairMojibake(String(lead?.dados_extras?._importacao?.banco||lead?.dados_extras?.banco||lead?.dados_extras?.Banco||"Banco não informado").trim())||"Banco não informado";
+ const bankName=repairMojibake(String(
+   lead?.dados_extras?._importacao?.banco||
+   lead?.dados_extras?.banco||
+   lead?.dados_extras?.Banco||
+   lead?.dados_extras?.["banco atual"]||
+   lead?.dados_extras?.["Banco Atual"]||
+   Object.entries(lead?.dados_extras||{}).find(([key,value])=>/^(banco|banco atual|banco do beneficio|banco do benefício|instituicao|instituição|instituicao financeira|instituição financeira|bank)$/i.test(String(key).trim())&&String(value??"").trim())?.[1]||
+   "Banco não informado"
+ ).trim())||"Banco não informado";
  const productName=repairMojibake(String(lead?.dados_extras?._importacao?.produto_original||lead?.produto||"Não informado").replace(/\s*•\s*Banco:\s*.+$/i,"").trim())||"Não informado";
  return <div className="dialerPage">
   {(error||msg)&&<div className={error?"alert error":"alert success"} role="alert"><b>{error?"Erro:":"Status:"}</b> {error||msg}</div>}
