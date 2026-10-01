@@ -86,7 +86,7 @@ const initials=(v="")=>v.split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join
 const whatsappHref=(value:any)=>{const d=String(value??"").replace(/\D/g,"");const n=d.startsWith("55")&&(d.length===12||d.length===13)?d:((d.length===10||d.length===11)?"55"+d:d);return n.length>=12&&n.length<=13?"https://wa.me/"+n:""};
 
 export default function Home(){
- const[session,setSession]=useState<any>(null),[operator,setOperator]=useState<any>(null),[mode,setMode]=useState("dashboard");
+ const[session,setSession]=useState<any>(null),[operator,setOperator]=useState<any>(null),[mode,setMode]=useState("dashboard"),[currentLeadId,setCurrentLeadId]=useState<string>("");
  const[leads,setLeads]=useState<Lead[]>([]),[npd,setNpd]=useState<any[]>([]),[stages,setStages]=useState<Stage[]>([]),[campaigns,setCampaigns]=useState<Campaign[]>([]),[returns,setReturns]=useState<ReturnRow[]>([]),[calls,setCalls]=useState<any[]>([]),[users,setUsers]=useState<UserRow[]>([]);
  const[scripts,setScripts]=useState<CallScript[]>([]);
  const[loading,setLoading]=useState(false),[error,setError]=useState(""),[showImport,setShowImport]=useState(false),[previews,setPreviews]=useState<any[]>([]),[files,setFiles]=useState<File[]>([]),[msg,setMsg]=useState("");
@@ -105,7 +105,8 @@ export default function Home(){
     return l.status==="disponivel"&&!l.bloqueado&&!l.opt_out&&l.telefones?.length&&!blockedCpf.has(cpfKey)&&!phones.some(n=>blockedPhones.has(n));
   }).sort((a,b)=>Number(b.margem_disponivel||0)-Number(a.margem_disponivel||0)||Number(b.prioridade||0)-Number(a.prioridade||0)||Number(a.tentativas_contato||0)-Number(b.tentativas_contato||0)||String(a.created_at||"").localeCompare(String(b.created_at||"")));
  },[leads,npd]);
- const current=available[0];
+ const current=available.find(l=>l.id===currentLeadId)||available[0];
+ useEffect(()=>{if(current&&!currentLeadId)setCurrentLeadId(current.id);if(currentLeadId&&!available.some(l=>l.id===currentLeadId))setCurrentLeadId(available[0]?.id||"")},[available,currentLeadId,current]);
 
  useEffect(()=>{
   if(!supabase){setError("Conexão com o banco não foi carregada. Verifique as variáveis NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY na Vercel.");setAuthReady(true);return}
@@ -407,7 +408,7 @@ async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,
    {mode!=="discador"&&error&&<div className="alert error"><b>Erro:</b> {error}<button onClick={()=>setError("")}>×</button></div>}
    {mode!=="discador"&&msg&&<div className="alert success">{msg}<button onClick={()=>setMsg("")}>×</button></div>}
    {mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length} campaigns={campaigns.length} returns={returns} calls={calls} loading={loading} dialerConfig={dialerConfig} onSaveDialer={saveDialer}/>}
-   {mode==="discador"&&<Dialer lead={current} available={available.length} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>callResult(r)} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} onNextLead={()=>{}} scripts={scripts} operator={operator}/>} 
+   {mode==="discador"&&<Dialer lead={current} available={available.length} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>callResult(r)} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} onNextLead={()=>{const i=available.findIndex(l=>l.id===current?.id);setCurrentLeadId(available[i+1]?.id||available[0]?.id||"")}} scripts={scripts} operator={operator}/>} 
    {mode==="crm"&&<DeskCRM leads={leads} stages={stages} onMove={moveLead} onOpen={setSelectedLead} onChannel={sendChannel} operator={operator}/>}   {mode==="resultados"&&<OperationalResults leads={leads} onOpen={setSelectedLead}/>}
    {mode==="leads"&&<Leads leads={paged} loading={loading} search={search} setSearch={setSearch} page={page} setPage={setPage} total={filtered.length} pageSize={pageSize} onOpen={setSelectedLead}/>}
    {mode==="campanhas"&&<Campaigns rows={campaigns} onCreate={createCampaign} onToggle={toggleCampaign} onDelete={deleteCampaign}/>}
