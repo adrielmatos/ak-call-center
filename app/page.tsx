@@ -420,7 +420,7 @@ async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,
    {mode!=="discador"&&error&&<div className="alert error"><b>Erro:</b> {error}<button onClick={()=>setError("")}>×</button></div>}
    {mode!=="discador"&&msg&&<div className="alert success">{msg}<button onClick={()=>setMsg("")}>×</button></div>}
    {mode==="dashboard"&&<Dashboard leads={leads} available={available.length} npd={npd.length} campaigns={campaigns.length} returns={returns} calls={calls} loading={loading} dialerConfig={dialerConfig} onSaveDialer={saveDialer}/>}
-   {mode==="discador"&&<Dialer lead={current} onCall={async()=>{if(!current?.telefones?.[0])return;try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json();if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.")}}} onResult={r=>callResult(r)} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} scripts={scripts} operator={operator}/>} 
+   {mode==="discador"&&<Dialer lead={current} onCall={async()=>{if(!current?.telefones?.[0]){setError("Lead sem telefone.");return false}try{const r=await fetch("/api/calls",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",lead_id:current.id,telefone_id:current.telefones[0].id})});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.error?.message||"Não foi possível iniciar a chamada.");window.location.href="tel:+"+current.telefones[0].numero_normalizado;return true}catch(e:any){setError(e?.message||"Falha ao iniciar chamada.");return false}}} onResult={r=>callResult(r)} onReturn={scheduleReturn} onBlock={block} onChannel={sendChannel} scripts={scripts} operator={operator} error={error} msg={msg}/>} 
    {mode==="crm"&&<DeskCRM leads={leads} stages={stages} onMove={moveLead} onOpen={setSelectedLead} onChannel={sendChannel} operator={operator}/>}   {mode==="resultados"&&<OperationalResults leads={leads} onOpen={setSelectedLead}/>}
    {mode==="leads"&&<Leads leads={paged} loading={loading} search={search} setSearch={setSearch} page={page} setPage={setPage} total={filtered.length} pageSize={pageSize} onOpen={setSelectedLead}/>}
    {mode==="campanhas"&&<Campaigns rows={campaigns} onCreate={createCampaign} onToggle={toggleCampaign} onDelete={deleteCampaign}/>}
@@ -515,10 +515,10 @@ function ScriptManager({scripts,onSave,canEdit}:{scripts:CallScript[];onSave:(da
 function Metric({title,value,icon,hint}:{title:string;value:number;icon:string;hint:string}){return <div className="panel metric"><div className="metricIcon">{icon}</div><div><span>{title}</span><strong>{value}</strong><small>{hint}</small></div></div>}
 function PanelTitle({title,subtitle}:{title:string;subtitle:string}){return <div className="panelTitle"><div><h3>{title}</h3><p>{subtitle}</p></div></div>}
 
-function Dialer({lead,onCall,onResult,onReturn,onBlock,onChannel,scripts,operator}:{lead?:Lead;onCall:()=>void;onResult:(r:string)=>void;onReturn:(dateTime:string,observacao:string)=>void;onBlock:()=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;scripts:CallScript[];operator?:any}){
+function Dialer({lead,onCall,onResult,onReturn,onBlock,onChannel,scripts,operator,error,msg}:{lead?:Lead;onCall:()=>Promise<boolean>;onResult:(r:string)=>void;onReturn:(dateTime:string,observacao:string)=>void;onBlock:()=>void;onChannel:(channel:"whatsapp"|"sms",lead:Lead)=>Promise<void>;scripts:CallScript[];operator?:any;error?:string;msg?:string}){
  const[showReturn,setShowReturn]=useState(false),[calling,setCalling]=useState(false),[dateTime,setDateTime]=useState(()=>{const d=new Date(Date.now()+86400000);d.setHours(9,0,0,0);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}),[obs,setObs]=useState("");
  useEffect(()=>{setCalling(false)},[lead?.id]);
- const call=()=>{if(!lead)return;setCalling(true);onCall()};
+ const call=async()=>{if(!lead)return;setCalling(true);const ok=await onCall();if(!ok)setCalling(false)};
  const repairMojibake=(value:string)=>{
   if(!/[ÃÂâð�]/.test(value))return value;
   try{
@@ -530,6 +530,7 @@ function Dialer({lead,onCall,onResult,onReturn,onBlock,onChannel,scripts,operato
  const bankName=repairMojibake(String(lead?.dados_extras?._importacao?.banco||lead?.dados_extras?.banco||lead?.dados_extras?.Banco||"Banco não informado").trim())||"Banco não informado";
  const productName=repairMojibake(String(lead?.dados_extras?._importacao?.produto_original||lead?.produto||"Não informado").replace(/\s*•\s*Banco:\s*.+$/i,"").trim())||"Não informado";
  return <div className="dialerPage">
+  {(error||msg)&&<div className={error?"alert error":"alert success"} role="alert"><b>{error?"Erro:":"Status:"}</b> {error||msg}<button className="btn" type="button" onClick={()=>{}} aria-label="Mensagem do discador">×</button></div>}
   <div className="dialGrid">
    <section className="panel callPanel">
     {lead?<><div className="person"><div className="personAvatar">{initials(lead.nome)}</div><div><div className="eyebrow">CONTATO ATUAL</div><h2>{lead.nome}</h2><p>{lead.cidade||"Cidade não informada"} {lead.uf&&"• "+lead.uf}</p></div></div>
