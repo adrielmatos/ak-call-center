@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Endpoints públicos usados por monitoramento e diagnóstico.
-  if (PUBLIC_API_PATHS.has(pathname)) {
+  if (PUBLIC_API_PATHS.has(pathname) || pathname === "/api/calls") {
     response.headers.set(
       "cache-control",
       "no-store",
