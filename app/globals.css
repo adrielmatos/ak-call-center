@@ -101,7 +101,7 @@
  .sidebar nav{grid-template-columns:repeat(3,minmax(0,1fr))}
  .sidebar nav button{min-height:46px}
 }
-.panelSubtle{margin-top:12px;padding:11px 12px;border:1px solid #e6edf4;background:#f8fafc;border-radius:10px}.panelSubtle b{font-size:10px}.panelSubtle p{margin:4px 0 0;color:var(--muted);font-size:9px;line-height:1.5}
+.panelSubtle{margin-top:12px;padding:11px 12px;border:1px solid #e6edf4;background:#f8fafc;border-radius:10px}.panelSubtle>span{display:block;color:var(--muted);font-size:10px;line-height:1.2;margin-bottom:4px}.panelSubtle b{display:block;font-size:12px;line-height:1.25}.panelSubtle p{margin:4px 0 0;color:var(--muted);font-size:9px;line-height:1.5}
 
 /* A&K brand lockup */
 .authBrandName{font-size:12px;font-weight:900;letter-spacing:.22em;margin-top:-2px;color:#d8e8f8}.mobileLogo .authBrandName{color:#0d1c2d;font-size:9px;letter-spacing:.18em;margin-bottom:10px}.mobileLogo .heroLogo{font-size:30px}.authHero .heroLogo{margin-bottom:0}
@@ -177,20 +177,20 @@
 .dialerPage .leadProduct,.dialerPage .leadPhone{padding:7px 10px;font-size:11px}
 .dialerPage .callState{font-size:11px;margin:9px 0 12px}
 .dialerPage .dialerActions{gap:7px}
-.dialerPage .dialerActions .btn{padding:9px 11px;font-size:11px;line-height:1.15}
+.dialerPage .dialerActions .btn{padding:10px 11px;font-size:12px;line-height:1.2}
 .dialerPage .tabulationPanel{padding:15px;min-height:0;overflow:hidden}
 .dialerPage .tabulationPanel .panelTitle{margin-bottom:10px}
 .dialerPage .tabulationPanel .panelTitle h3{font-size:15px}
 .dialerPage .tabulationPanel .panelTitle p{font-size:10px}
 .dialerPage .tabulationPanel .resultGrid{height:calc(100% - 45px);grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
-.dialerPage .tabulationPanel .resultGrid button{padding:10px 7px;font-size:11px;min-height:38px}
+.dialerPage .tabulationPanel .resultGrid button{padding:11px 7px;font-size:12px;min-height:42px}
 .dialerPage .scriptPanel{height:100%;min-height:0;padding:17px;display:flex;flex-direction:column;overflow:hidden}
 .dialerPage .scriptPanel .panelTitle{margin-bottom:10px}
 .dialerPage .scriptPanel .panelTitle h3{font-size:15px}
 .dialerPage .scriptPanel .panelTitle p{font-size:10px}
 .dialerPage .scriptPanel .scriptCard{min-height:0;display:flex;flex-direction:column;flex:1}
 .dialerPage .scriptPanel .scriptCard>p{font-size:12px;margin:4px 0}
-.dialerPage .scriptPanel .scriptBlock{max-height:none;flex:1;overflow:auto;font-size:12px;line-height:1.55}
+.dialerPage .scriptPanel .scriptBlock{max-height:none;flex:1;overflow:auto;font-size:13px;line-height:1.6}
 .dialerPage .scriptPanel .eyebrow{font-size:10px}
 @media(max-width:1200px){
  .dialerPage{height:auto;min-height:0}
