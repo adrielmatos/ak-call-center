@@ -91,6 +91,26 @@ export default function Home(){
  const[scripts,setScripts]=useState<CallScript[]>([]);
  const[loading,setLoading]=useState(false),[error,setError]=useState(""),[showImport,setShowImport]=useState(false),[previews,setPreviews]=useState<any[]>([]),[files,setFiles]=useState<File[]>([]),[msg,setMsg]=useState("");
  const[search,setSearch]=useState(""),[page,setPage]=useState(1),[selectedLead,setSelectedLead]=useState<Lead|null>(null),[authReady,setAuthReady]=useState(false),[recovery,setRecovery]=useState(false),[channelConfig,setChannelConfig]=useState<any>(null),[dialerConfig,setDialerConfig]=useState<any>(null);
+ const[showLogin,setShowLogin]=useState(false);
+ useEffect(()=>{
+  if(typeof window!=="undefined"){
+   const check=()=>{
+    const q=new URLSearchParams(window.location.search);
+    if(q.has("login")||window.location.hash==="#login"){
+     setShowLogin(true);
+    }else{
+     setShowLogin(false);
+    }
+   };
+   check();
+   window.addEventListener("popstate",check);
+   window.addEventListener("hashchange",check);
+   return ()=>{
+    window.removeEventListener("popstate",check);
+    window.removeEventListener("hashchange",check);
+   };
+  }
+ },[]);
  const pageSize=50;
  const[debouncedSearch,setDebouncedSearch]=useState("");
  useEffect(()=>{const t=setTimeout(()=>setDebouncedSearch(search),250);return()=>clearTimeout(t)},[search]);
@@ -441,7 +461,45 @@ async function saveDialerFor(targetId:string,data:any){
 async function saveDialer(data:any){if(operator)await saveDialerFor(operator.id,data)}
 
  if(!authReady)return <div className="boot"><div className="bootLogo">A<span>&</span>K</div><div className="spinner"/><p>Inicializando central segura...</p></div>;
- if(!session||recovery)return <AuthScreen recovery={recovery} onAuth={auth} reset={resetPassword} updatePassword={updatePassword} msg={msg} error={error}/>;
+ if(!session){
+  if(showLogin||recovery){
+   return (
+    <div>
+     <div style={{position:"fixed",top:16,left:16,zIndex:9999}}>
+      <button
+       onClick={()=>{
+        setShowLogin(false);
+        if(window.history.pushState){
+         window.history.pushState(null,"","/");
+        }
+       }}
+       style={{
+        background:"rgba(15, 23, 42, 0.9)",
+        color:"#f59e0b",
+        border:"1px solid rgba(245, 158, 11, 0.4)",
+        padding:"8px 16px",
+        borderRadius:10,
+        fontSize:13,
+        fontWeight:800,
+        cursor:"pointer",
+        boxShadow:"0 4px 12px rgba(0,0,0,0.5)",
+       }}
+      >
+       ← Voltar para o site
+      </button>
+     </div>
+     <AuthScreen recovery={recovery} onAuth={auth} reset={resetPassword} updatePassword={updatePassword} msg={msg} error={error}/>
+    </div>
+   );
+  }
+  return (
+   <>
+    <link rel="stylesheet" href="/assets/index-jLCnV89z.css" />
+    <div id="root" />
+    <script type="module" src="/assets/index-MlBAo6-l.js" />
+   </>
+  );
+ }
 
  const allNav=[
   ["dashboard","Visão geral","⌂"],["discador","Discador","☎"],["crm","CRM","◆"],["resultados","Resultados","↳"],["leads","Leads","◉"],["campanhas","Campanhas","▣"],["retornos","Retornos","◷"],["telefonia","Telefonia","◌"],["mensagens","Omnichannel","✉"],["relatorios","Relatórios","▥"],["npd","Não Perturbe","⊘"],["scripts","Scripts de ligação","✎"],["config","Configurações","⚙"]
