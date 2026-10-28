@@ -94,7 +94,7 @@ export default function ComparisonTable({ onOpenDemoModal }: ComparisonTableProp
                     Critério / Funcionalidade
                   </th>
                   <th className="py-5 px-6 text-sm font-extrabold text-amber-400 bg-brand-royal/30 border-x border-amber-500/30 w-3/10 text-center">
-                    <span className="block text-white text-base">Discadora Consignado Pro</span>
+                    <span className="block text-white text-base">AK Soluções Financeiras</span>
                     <span className="text-[11px] font-normal text-amber-300">Nossa Solução</span>
                   </th>
                   <th className="py-5 px-6 text-sm font-bold text-slate-400 w-3/10 text-center">

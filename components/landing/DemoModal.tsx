@@ -45,7 +45,7 @@ export default function DemoModal({
     // 2. Abre a conversa no WhatsApp do Dono (5579981052664)
     const customText = defaultMessage
       ? defaultMessage
-      : `Olá! Me chamo ${nome || "um Correspondente"}. Meu WhatsApp é ${whatsapp || "não informado"}. Tenho uma equipe com ${operadores}. Gostaria de conhecer e agendar uma demonstração da Discadora Consignado Pro!`;
+      : `Olá! Me chamo ${nome || "um Correspondente"}. Meu WhatsApp é ${whatsapp || "não informado"}. Tenho uma equipe com ${operadores}. Gostaria de conhecer e agendar uma demonstração da AK Soluções Financeiras!`;
 
     const cleanNumber = siteConfig.whatsappNumber.replace(/\D/g, "");
     const encodedText = encodeURIComponent(customText);

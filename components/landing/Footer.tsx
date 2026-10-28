@@ -1,5 +1,5 @@
 import { siteConfig } from "@/config/site";
-import { PhoneCall, LogIn, ShieldCheck, Heart } from "lucide-react";
+import { LogIn, ShieldCheck } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -9,11 +9,11 @@ export default function Footer() {
           {/* Col 1: Brand & Tagline */}
           <div className="md:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-brand-royal flex items-center justify-center text-amber-400">
-                <PhoneCall className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm">
+                AK
               </div>
               <span className="font-extrabold text-lg text-white tracking-tight">
-                Discadora <span className="text-amber-400">Consignado</span> PRO
+                AK <span className="text-amber-400">Soluções Financeiras</span>
               </span>
             </div>
             <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-md">
@@ -39,6 +39,11 @@ export default function Footer() {
               <li>
                 <a href="#calculadora" className="hover:text-amber-400 transition-colors">
                   Calculadora VoIP
+                </a>
+              </li>
+              <li>
+                <a href="#esteira-inss" className="hover:text-amber-400 transition-colors">
+                  Esteira Meu INSS
                 </a>
               </li>
               <li>
@@ -69,8 +74,6 @@ export default function Footer() {
             </p>
             <a
               href={siteConfig.systemLoginUrl}
-              target="_blank"
-              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-navy-850 hover:bg-navy-800 text-white border border-navy-700 hover:border-brand-blue text-xs font-semibold transition-all"
             >
               <LogIn className="w-4 h-4 text-cyan-400" />
@@ -82,7 +85,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-navy-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-400 text-[11px]">
           <div>
-            © {new Date().getFullYear()} Discadora Consignado Pro. Todos os direitos reservados.
+            © {new Date().getFullYear()} AK Soluções Financeiras. Todos os direitos reservados.
           </div>
           <div>
             Desenvolvido exclusivamente para Correspondentes Bancários e Promotoras de Crédito.

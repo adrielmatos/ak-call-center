@@ -1,6 +1,4 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { 
   Calculator, 
@@ -15,31 +13,47 @@ interface RoiCalculatorProps {
 }
 
 export default function RoiCalculator({ onOpenDemoModal }: RoiCalculatorProps) {
-  const [operators, setOperators] = useState(5);
-  const [voipCostPerAgent, setVoipCostPerAgent] = useState(350);
+  const [operators, setOperators] = useState<number>(6);
+  const [voipCostPerAgent, setVoipCostPerAgent] = useState<number>(350);
 
-  // Traditional VoIP calculation (Plan cost + Minutes + Taxes)
-  const monthlyVoipTotal = operators * voipCostPerAgent;
-  const annualVoipTotal = monthlyVoipTotal * 12;
+  // Cálculos dinâmicos em tempo real
+  const monthlyVoipTotal = useMemo(() => {
+    return operators * voipCostPerAgent;
+  }, [operators, voipCostPerAgent]);
 
-  // Discadora Consignado Pro cost (Fixed software, 0 minutes cost)
-  let monthlyOurCost = 97;
-  if (operators > 1 && operators <= 5) {
-    monthlyOurCost = 247;
-  } else if (operators > 5) {
-    monthlyOurCost = 247 + (operators - 5) * 45;
-  }
-  const annualOurCost = monthlyOurCost * 12;
+  const annualVoipTotal = useMemo(() => {
+    return monthlyVoipTotal * 12;
+  }, [monthlyVoipTotal]);
 
-  // Savings
-  const monthlySavings = Math.max(0, monthlyVoipTotal - monthlyOurCost);
-  const annualSavings = monthlySavings * 12;
-  const savingsPercent = Math.round((monthlySavings / monthlyVoipTotal) * 100);
+  // Custo da plataforma AK Soluções Financeiras (software fixo, 0 minutos de VoIP)
+  const monthlyOurCost = useMemo(() => {
+    if (operators <= 1) return 97;
+    if (operators <= 5) return 247;
+    return 247 + (operators - 5) * 45;
+  }, [operators]);
+
+  const annualOurCost = useMemo(() => {
+    return monthlyOurCost * 12;
+  }, [monthlyOurCost]);
+
+  // Economia mensal e anual
+  const monthlySavings = useMemo(() => {
+    return Math.max(0, monthlyVoipTotal - monthlyOurCost);
+  }, [monthlyVoipTotal, monthlyOurCost]);
+
+  const annualSavings = useMemo(() => {
+    return monthlySavings * 12;
+  }, [monthlySavings]);
+
+  const savingsPercent = useMemo(() => {
+    if (monthlyVoipTotal <= 0) return 0;
+    return Math.round((monthlySavings / monthlyVoipTotal) * 100);
+  }, [monthlySavings, monthlyVoipTotal]);
 
   const handleCtaClick = () => {
     const msg = `Olá! Fiz a simulação na calculadora para ${operators} operadores e vi que o custo de VoIP da minha equipe (${formatCurrency(
       monthlyVoipTotal
-    )}/mês) cai para apenas ${formatCurrency(monthlyOurCost)}/mês com a Discadora Consignado Pro. Quero garantir essa economia!`;
+    )}/mês) cai para apenas ${formatCurrency(monthlyOurCost)}/mês com a AK Soluções Financeiras. Quero garantir essa economia!`;
     onOpenDemoModal(msg);
   };
 
@@ -64,7 +78,7 @@ export default function RoiCalculator({ onOpenDemoModal }: RoiCalculatorProps) {
           </h2>
           <p className="mt-4 text-base sm:text-lg text-slate-300">
             Discadores tradicionais cobram mensalidade por posto mais cobrança por segundo falado.
-            Com a Discadora Consignado Pro, sua chamada sai pelo chip ilimitado do celular dos operadores.
+            Com a AK Soluções Financeiras, sua chamada sai pelo chip ilimitado do celular dos operadores via PC.
           </p>
         </div>
 
@@ -171,7 +185,7 @@ export default function RoiCalculator({ onOpenDemoModal }: RoiCalculatorProps) {
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-200 font-medium">Discadora Consignado Pro:</span>
+                  <span className="text-slate-200 font-medium">AK Soluções Financeiras:</span>
                   <span className="font-mono text-emerald-400 font-bold">
                     {formatCurrency(monthlyOurCost)}/mês
                   </span>

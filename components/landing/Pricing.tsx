@@ -91,7 +91,7 @@ export default function Pricing({ onOpenDemoModal }: PricingProps) {
                 <div className="p-6 sm:p-8 pt-0">
                   <button
                     onClick={() => {
-                      const msg = `Olá! Gostaria de contratar ou testar o ${plan.name} (R$ ${plan.price}/mês) da Discadora Consignado Pro.`;
+                      const msg = `Olá! Gostaria de contratar ou testar o ${plan.name} (R$ ${plan.price}/mês) da AK Soluções Financeiras.`;
                       onOpenDemoModal(msg);
                     }}
                     className={`w-full py-4 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all ${
@@ -130,7 +130,7 @@ export default function Pricing({ onOpenDemoModal }: PricingProps) {
           <button
             onClick={() =>
               onOpenDemoModal(
-                "Olá! Possuo uma operação com mais de 30 operadores e gostaria de uma proposta personalizada para a Discadora Consignado Pro."
+                "Olá! Possuo uma operação com mais de 30 operadores e gostaria de uma proposta personalizada para a AK Soluções Financeiras."
               )
             }
             className="text-xs font-bold text-amber-400 hover:text-amber-300 whitespace-nowrap px-4 py-2 rounded-lg bg-navy-850 border border-amber-500/30 hover:border-amber-400 transition-colors"

@@ -1,5 +1,5 @@
 export const siteConfig = {
-  name: "Discadora Consignado Pro",
+  name: "AK Soluções Financeiras",
   tagline: "CRM & Discador pelo Celular para Crédito Consignado",
   description:
     "A única discadora desenvolvida especificamente para correspondentes de crédito consignado. Zero custo de telefonia VoIP (disque direto pelo chip do celular via PC), esteira Meu INSS, simulador de margem e esteira de anuência blindada.",
@@ -7,7 +7,7 @@ export const siteConfig = {
   systemLoginUrl: "https://discadora-callcenter.vercel.app/login",
   whatsappNumber: "5579981052664",
   whatsappDefaultMessage:
-    "Olá! Gostaria de agendar uma demonstração gratuita e conhecer os planos da Discadora Consignado Pro.",
+    "Olá! Gostaria de agendar uma demonstração gratuita e conhecer os planos da AK Soluções Financeiras.",
   
   metrics: [
     { label: "Custo por Minuto Falado", value: "R$ 0,00", desc: "Usa o plano ilimitado do seu chip" },

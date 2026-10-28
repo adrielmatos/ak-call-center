@@ -94,7 +94,7 @@ export default function Hero({ onOpenDemoModal }: HeroProps) {
               Zero Custo VoIP
             </span>{" "}
             e Foco Total em Fechar a{" "}
-            <span className="underline decoration-brand-blue decoration-wavy decoration-2">
+            <span className="text-amber-400 font-extrabold">
               Anuência Meu INSS
             </span>
           </h1>
