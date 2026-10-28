@@ -30,13 +30,13 @@ export default function Navbar({ onOpenDemoModal }: NavbarProps) {
         <div className="flex items-center justify-between">
           {/* Logo AK */}
           <a href="#" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-extrabold flex items-center justify-center text-lg shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-all">
-              AK
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-all">
+              <PhoneCall className="w-5 h-5 text-amber-300" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-lg sm:text-xl text-white tracking-tight">
-                  AK <span className="text-amber-400">Soluções Financeiras</span>
+                  A&K <span className="text-amber-400">Soluções Financeiras</span>
                 </span>
                 <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-brand-royal text-blue-200 border border-brand-blue/40 tracking-wider">
                   CRM

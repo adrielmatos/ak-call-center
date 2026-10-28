@@ -146,11 +146,39 @@ export default function RoiCalculator({ onOpenDemoModal }: RoiCalculatorProps) {
                 />
                 
                 {/* Total gasto calculado automaticamente */}
-                <div className="mt-4 p-3 bg-red-950/20 border border-red-900/30 rounded-xl flex items-center justify-between">
-                  <span className="text-xs text-slate-300 font-medium">Gasto Total da sua Equipe no VoIP:</span>
-                  <span className="text-base font-black text-red-400 font-mono">
-                    {formatCurrency(monthlyVoipTotal)}/mês
-                  </span>
+                <div className="mt-4 p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="text-slate-400 font-medium">Gasto Atual no VoIP ({operators} ops):</span>
+                    <span className="text-sm font-bold text-red-400 font-mono line-through">
+                      {formatCurrency(monthlyVoipTotal)}/mês
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="text-slate-300 font-medium">Custo com A&K Soluções:</span>
+                    <span className="text-sm font-bold text-emerald-400 font-mono">
+                      {formatCurrency(monthlyOurCost)}/mês
+                    </span>
+                  </div>
+                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Sua Economia Todo Mês:</span>
+                      <span className="text-[11px] text-emerald-400 font-semibold">{savingsPercent}% de Redução</span>
+                    </div>
+                    <span className="text-lg sm:text-xl font-black text-amber-400 font-mono">
+                      {formatCurrency(monthlySavings)}/mês
+                    </span>
+                  </div>
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCtaClick}
+                      className="w-full py-3 px-4 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-slate-950 shadow-md shadow-amber-500/20 hover:scale-[1.01] transition-transform cursor-pointer"
+                    >
+                      <Zap className="w-4 h-4 fill-slate-950" />
+                      <span>GARANTIR ESSA ECONOMIA NO WHATSAPP</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
