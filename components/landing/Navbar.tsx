@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { siteConfig } from "@/config/site";
-import { PhoneCall, MessageCircle, LogIn, Menu, X, ShieldCheck } from "lucide-react";
+import { PhoneCall, MessageCircle, LogIn, Menu, X } from "lucide-react";
 
 interface NavbarProps {
   onOpenDemoModal: () => void;
@@ -98,8 +98,6 @@ export default function Navbar({ onOpenDemoModal }: NavbarProps) {
             {/* Botão Oficial de Login do Sistema */}
             <a
               href={siteConfig.systemLoginUrl}
-              target="_blank"
-              rel="noopener noreferrer"
               className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold text-slate-200 hover:text-white bg-navy-850/80 hover:bg-navy-800 border border-navy-700/80 hover:border-brand-blue/50 transition-all shadow-sm"
               title="Acessar o Painel Operacional da Discadora"
             >
@@ -107,7 +105,7 @@ export default function Navbar({ onOpenDemoModal }: NavbarProps) {
               <span>Acessar Sistema</span>
             </a>
 
-            {/* CTA Vibrante (Mix Mateus style) */}
+            {/* CTA Vibrante */}
             <button
               onClick={onOpenDemoModal}
               className="btn-cta-vibrant flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-extrabold"
@@ -121,12 +119,11 @@ export default function Navbar({ onOpenDemoModal }: NavbarProps) {
           <div className="flex items-center gap-2 md:hidden">
             <a
               href={siteConfig.systemLoginUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-lg bg-navy-850 text-cyan-400 border border-navy-700"
+              className="p-2 rounded-lg bg-navy-850 text-cyan-400 border border-navy-700 flex items-center gap-1.5 text-xs font-bold"
               title="Acessar Sistema"
             >
-              <LogIn className="w-5 h-5" />
+              <LogIn className="w-4 h-4" />
+              <span>Entrar</span>
             </a>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -193,8 +190,6 @@ export default function Navbar({ onOpenDemoModal }: NavbarProps) {
           <div className="pt-2 border-t border-navy-800 space-y-2">
             <a
               href={siteConfig.systemLoginUrl}
-              target="_blank"
-              rel="noopener noreferrer"
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-navy-850 border border-navy-700"
             >
               <LogIn className="w-4 h-4 text-cyan-400" />

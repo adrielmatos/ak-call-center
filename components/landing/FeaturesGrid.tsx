@@ -15,6 +15,7 @@ interface FeaturesGridProps {
 
 const features = [
   {
+    id: "phone-link",
     icon: Smartphone,
     title: "Discador pelo Celular (Phone Link)",
     badge: "Zero Custo VoIP",
@@ -24,6 +25,7 @@ const features = [
     image: "/mockups/10-operador-fila.png",
   },
   {
+    id: "esteira-inss",
     icon: Workflow,
     title: "Esteira de Anuência Meu INSS",
     badge: "Foco no Fechamento",
@@ -33,6 +35,7 @@ const features = [
     image: "/mockups/02-crm-esteira.png",
   },
   {
+    id: "simulador-margem",
     icon: Calculator,
     title: "Simulador de Margem Integrado",
     badge: "Blindagem de Proposta",
@@ -42,6 +45,7 @@ const features = [
     image: "/mockups/12b-operador-simulador.png",
   },
   {
+    id: "roteiro-objecoes",
     icon: BookOpenCheck,
     title: "Roteiro & Objeções ao Vivo",
     badge: "Mais Conversão",
@@ -51,6 +55,7 @@ const features = [
     image: "/mockups/04-campanha-regras.png",
   },
   {
+    id: "cadencia-rechamada",
     icon: Repeat,
     title: "Cadência & Renitência Inteligente",
     badge: "Não Queima Base",
@@ -60,6 +65,7 @@ const features = [
     image: "/mockups/04b-campanha-cadencia.png",
   },
   {
+    id: "lgpd-bloqueio",
     icon: ShieldCheck,
     title: "Conformidade LGPD & Não Perturbe",
     badge: "Segurança Jurídica",
@@ -72,7 +78,7 @@ const features = [
 
 export default function FeaturesGrid({ onOpenDemoModal }: FeaturesGridProps) {
   return (
-    <section id="funcionalidades" className="py-20 md:py-28 bg-navy-950 relative">
+    <section id="funcionalidades" className="py-20 md:py-28 bg-navy-950 relative scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Title */}
         <div className="text-center max-w-3xl mx-auto mb-16">
@@ -98,7 +104,8 @@ export default function FeaturesGrid({ onOpenDemoModal }: FeaturesGridProps) {
             return (
               <div
                 key={index}
-                className="bg-navy-900/80 rounded-2xl border border-navy-700/80 overflow-hidden shadow-xl hover:border-brand-blue/60 transition-all duration-300 flex flex-col justify-between group"
+                id={feature.id}
+                className="bg-navy-900/80 rounded-2xl border border-navy-700/80 overflow-hidden shadow-xl hover:border-brand-blue/60 transition-all duration-300 flex flex-col justify-between group scroll-mt-28"
               >
                 {/* Visual Preview Header */}
                 <div className="relative aspect-[16/9] w-full bg-navy-950 overflow-hidden border-b border-navy-800">
