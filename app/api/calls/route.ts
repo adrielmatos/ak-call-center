@@ -46,7 +46,7 @@ export async function POST(request:Request){
   const {data:operator,error:oe}=await supabase.from("operadores").select("id,ativo").eq("auth_user_id",user.id).maybeSingle();
   if(oe||!operator?.ativo)return NextResponse.json({error:{code:"operator_not_allowed",message:"Operador ativo não encontrado."}},{status:403,headers:{"x-request-id":requestId}});
 
-  const {data:lead,error:le}=await supabase.from("leads").select("id,cpf,telefone,bloqueado,opt_out").eq("id",input.lead_id).maybeSingle();
+  const {data:lead,error:le}=await supabase.from("leads").select("id,cpf,telefone,bloqueado,opt_out,operador_id,tentativas_contato").eq("id",input.lead_id).maybeSingle();
   if(le)return NextResponse.json({error:{code:"lead_lookup_failed",message:le.message}},{status:400,headers:{"x-request-id":requestId}});
   if(!lead)return NextResponse.json({error:{code:"lead_not_found",message:"Lead não encontrado."}},{status:404,headers:{"x-request-id":requestId}});
   if(lead.bloqueado||lead.opt_out)return NextResponse.json({error:{code:"lead_blocked",message:"Lead bloqueado para contato."}},{status:409,headers:{"x-request-id":requestId}});
@@ -79,6 +79,13 @@ export async function POST(request:Request){
     }).select("*").single();
     if(ce)return NextResponse.json({error:{code:"call_create_failed",message:ce.message}},{status:400,headers:{"x-request-id":requestId}});
     call=created;
+    const {error:leadUpdateError}=await supabase.from("leads").update({
+      operador_id:operator.id,
+      status:"EM_ATENDIMENTO",
+      ultima_ligacao_at:inicio,
+      tentativas_contato:(lead.tentativas_contato||0)+1
+    }).eq("id",input.lead_id);
+    if(leadUpdateError)return NextResponse.json({error:{code:"lead_assignment_failed",message:leadUpdateError.message}},{status:400,headers:{"x-request-id":requestId}});
   }else{
     if(input.call_id){
       const {data:existing}=await supabase.from("ligacoes").select("*").eq("id",input.call_id).eq("operador_id",operator.id).maybeSingle();
