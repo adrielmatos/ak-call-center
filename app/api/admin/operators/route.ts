@@ -1,72 +1,104 @@
 import { NextResponse } from "next/server";
-import { createClient as createPublicClient } from "@supabase/supabase-js";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   try {
+    // A sessão do solicitante é validada com o cliente público/cookies.
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-
-    const { data: operator } = await supabase.from("operadores")
-      .select("id,perfil").eq("auth_user_id", user.id).maybeSingle();
-
-    if (operator?.perfil !== "admin") {
-      return NextResponse.json({ error: "Apenas administradores podem criar operadores." }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
     }
 
-    // Impede duplicidade no cadastro operacional antes de criar a conta Auth.
+    const { data: requester } = await supabase
+      .from("operadores")
+      .select("id,perfil,ativo")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+
+    if (requester?.perfil !== "admin" || requester.ativo === false) {
+      return NextResponse.json({ error: "Apenas administradores ativos podem criar usuários." }, { status: 403 });
+    }
+
     const body = await request.json();
     const nome = String(body.nome || "").trim();
     const email = String(body.email || "").trim().toLowerCase();
     const senha = String(body.senha || "");
-    const perfil = ["admin","gestor","operador"].includes(body.perfil) ? body.perfil : "operador";
-    if (!nome || !email || senha.length < 8) {
-      return NextResponse.json({ error: "Nome, e-mail e senha com pelo menos 8 caracteres são obrigatórios." }, { status: 400 });
+    const perfil = ["admin", "gestor", "operador"].includes(body.perfil) ? body.perfil : "operador";
+
+    if (!nome || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || senha.length < 8) {
+      return NextResponse.json({ error: "Informe nome, e-mail válido e senha com pelo menos 8 caracteres." }, { status: 400 });
     }
-    const { data: existingOperator } = await supabase.from("operadores")
-      .select("id").ilike("email", email).maybeSingle();
+
+    const { data: existingOperator, error: lookupError } = await supabase
+      .from("operadores")
+      .select("id")
+      .ilike("email", email)
+      .maybeSingle();
+
+    if (lookupError) {
+      return NextResponse.json({ error: "Não foi possível verificar se o usuário já existe.", detail: lookupError.message }, { status: 500 });
+    }
     if (existingOperator) {
-      return NextResponse.json({ error: "Já existe um cadastro operacional com este e-mail. Use a recuperação de acesso ou confira o cadastro existente." }, { status: 409 });
+      return NextResponse.json({ error: "Já existe um usuário operacional com este e-mail." }, { status: 409 });
     }
+
     const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
-    const key = String(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "").trim();
-    if (!url || !key) return NextResponse.json({ error: "Supabase não configurado." }, { status: 503 });
+    const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+    if (!url || !serviceRoleKey) {
+      return NextResponse.json({ error: "Configuração administrativa do Supabase ausente no servidor. Verifique SUPABASE_SERVICE_ROLE_KEY." }, { status: 503 });
+    }
 
-    // Cria o usuário Auth com a chave publicável; o cadastro do operador é feito
-    // pela sessão autenticada do administrador e protegido por RLS.
-    const authClient = createPublicClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data: created, error: authError } = await authClient.auth.signUp({
-      email, password: senha, options: { data: { nome } },
+    // Chave privilegiada usada exclusivamente no servidor, após validar o administrador.
+    // email_confirm=true libera o login imediato e não dispara confirmação de cadastro.
+    const admin = createSupabaseClient(url, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
     });
+
+    const { data: created, error: authError } = await admin.auth.admin.createUser({
+      email,
+      password: senha,
+      email_confirm: true,
+      user_metadata: { nome },
+    });
+
     if (authError || !created.user) {
-      return NextResponse.json({ error: authError?.message || "Não foi possível criar o usuário." }, { status: 400 });
-    }
-    // Supabase pode retornar um usuário fictício sem erro quando o e-mail já existe.
-    // Não associar esse ID a um novo perfil nem informar sucesso.
-    if (created.user.identities?.length === 0) {
-      return NextResponse.json({ error: "Este e-mail já possui uma conta de acesso. Não foi criada uma nova senha. Use a recuperação de senha ou informe outro e-mail." }, { status: 409 });
+      const message = authError?.message || "Não foi possível criar a conta de autenticação.";
+      const duplicate = /already|exists|registered|duplicate/i.test(message);
+      return NextResponse.json({
+        error: duplicate
+          ? "Este e-mail já possui uma conta de autenticação. Não foi alterada a senha existente."
+          : message,
+      }, { status: duplicate ? 409 : 400 });
     }
 
-    const { error: opError } = await supabase.from("operadores").insert({
-      nome, email, perfil, ativo: body.ativo !== false, auth_user_id: created.user.id,
-      permissoes: {}, preferencias: {},
+    const { error: profileError } = await admin.from("operadores").insert({
+      nome,
+      email,
+      perfil,
+      ativo: body.ativo !== false,
+      auth_user_id: created.user.id,
+      permissoes: {},
+      preferencias: {},
     });
-    if (opError) {
+
+    if (profileError) {
+      // Rollback: evita deixar conta Auth órfã se o perfil operacional falhar.
+      await admin.auth.admin.deleteUser(created.user.id);
       return NextResponse.json({
-        error: "A conta de autenticação foi criada, mas o perfil operacional não foi salvo. Contate o administrador.",
-        detail: opError.message, user_id: created.user.id,
-      }, { status: 400 });
+        error: "O perfil operacional não foi salvo. A conta de autenticação criada nesta tentativa foi revertida; tente novamente.",
+        detail: profileError.message,
+      }, { status: 500 });
     }
+
     return NextResponse.json({
       ok: true,
       user_id: created.user.id,
-      confirmation_required: !created.session,
-      message: created.session
-        ? "Usuário cadastrado e pronto para acessar."
-        : "Cadastro criado. O usuário precisa confirmar o e-mail antes do primeiro acesso.",
-    }, { status: created.session ? 201 : 202 });
+      confirmation_required: false,
+      message: "Usuário cadastrado, confirmado e pronto para entrar com a senha definida.",
+    }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || "Erro interno." }, { status: 500 });
+    return NextResponse.json({ error: error?.message || "Erro interno ao cadastrar usuário." }, { status: 500 });
   }
 }
