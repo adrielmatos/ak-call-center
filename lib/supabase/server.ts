@@ -6,8 +6,7 @@ import { cookies } from "next/headers";
 function getPublicConfig() {
   const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
   const key = String(
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || ""
   ).trim();
   if (!url || !key) {
     throw new Error("Supabase não configurado. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY no ambiente.");
