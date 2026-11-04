@@ -22,7 +22,7 @@ const normalize = (v:string) => String(v||"").normalize("NFD").replace(/[\u0300-
 const digits = (v:string) => String(v||"").replace(/\D/g,"");
 const productKey = (v:string|null) => {
   const p=normalize(String(v||"").replace(/\s*[•|]\s*banco\s*:.+$/i,""));
-  const keys=["INSS","SIAPE","FGTS","CLT","BPC/LOAS","Consignado Público","Consignado Privado","Crédito Pessoal","Cartão Consignado","Cartão Benefício","Seguros","Energia Solar","Atendimento"];
+  const keys=["INSS","SIAPE","FGTS","CLT","BPC/LOAS","Consignado Público","Consignado Privado","Militar","Crédito Pessoal","Cartão Consignado","Cartão Benefício","Seguros","Energia Solar","Abertura de conta Santander","Crédito com Imóvel em Garantia","Crédito com Veículo em Garantia","Atendimento"];
   return keys.find(k=>p.includes(normalize(k))) || "Atendimento";
 };
 
