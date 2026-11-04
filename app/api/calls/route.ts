@@ -121,6 +121,17 @@ export async function POST(request:Request){
     }
   }
 
+  if(input.action==="finish" && input.resultado==="Não Perturbe"){
+    let alreadyBlocked=false;
+    if(cpfKey){const {data:rows}=await supabase.from("lista_nao_perturbe").select("id").eq("ativo",true).eq("cpf",cpfKey).limit(1);alreadyBlocked=Boolean(rows?.length);}
+    if(!alreadyBlocked && phoneKey){const {data:rows}=await supabase.from("lista_nao_perturbe").select("id").eq("ativo",true).eq("telefone",phoneKey).limit(1);alreadyBlocked=Boolean(rows?.length);}
+    if(!alreadyBlocked && (cpfKey || phoneKey)){
+      const {error:blockError}=await supabase.from("lista_nao_perturbe").insert({cpf:cpfKey||null,telefone:phoneKey||null,motivo:"Solicitação de não contato durante ligação",origem:"ligacao",created_by:operator.id,ativo:true});
+      if(blockError)return NextResponse.json({error:{code:"npd_insert_failed",message:blockError.message}},{status:400,headers:{"x-request-id":requestId}});
+    }
+    const {error:leadBlockError}=await supabase.from("leads").update({status:"NPO",bloqueado:true,opt_out:true}).eq("id",input.lead_id);
+    if(leadBlockError)return NextResponse.json({error:{code:"lead_block_failed",message:leadBlockError.message}},{status:400,headers:{"x-request-id":requestId}});
+  }
   if(input.consentimento!==undefined){
     await supabase.from("consent_logs").insert({user_id:user.id,operator_id:operator.id,lead_id:input.lead_id,consent_type:input.consentimento_tipo||"contato",granted:input.consentimento,source:"call_api",request_id:requestId});
   }
