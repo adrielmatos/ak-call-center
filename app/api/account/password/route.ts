@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     }
 
     const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
-    const key = String(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "").trim();
+    const key = String(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "").trim();
     if (!url || !key) return NextResponse.json({ error: "Supabase não configurado." }, { status: 503 });
 
     const verifier = createPublicClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
