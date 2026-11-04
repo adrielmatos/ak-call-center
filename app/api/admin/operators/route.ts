@@ -11,6 +11,10 @@ export async function POST(request: Request) {
     const { data: operator } = await supabase.from("operadores")
       .select("id,perfil").eq("auth_user_id", user.id).maybeSingle();
 
+    if (operator?.perfil !== "admin") {
+      return NextResponse.json({ error: "Apenas administradores podem criar operadores." }, { status: 403 });
+    }
+
     // Impede duplicidade no cadastro operacional antes de criar a conta Auth.
     const body = await request.json();
     const nome = String(body.nome || "").trim();
@@ -25,10 +29,6 @@ export async function POST(request: Request) {
     if (existingOperator) {
       return NextResponse.json({ error: "Já existe um cadastro operacional com este e-mail. Use a recuperação de acesso ou confira o cadastro existente." }, { status: 409 });
     }
-    if (operator?.perfil !== "admin") {
-      return NextResponse.json({ error: "Apenas administradores podem criar operadores." }, { status: 403 });
-    }
-
     const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
     const key = String(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "").trim();
     if (!url || !key) return NextResponse.json({ error: "Supabase não configurado." }, { status: 503 });
