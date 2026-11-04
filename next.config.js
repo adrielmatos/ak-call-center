@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 
-const supabaseOrigin = "https://vtwyojpsrjyigsnnfawa.supabase.co";
+const supabaseOrigin = "https://evwxtcwasgjurqlwopfx.supabase.co";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -35,11 +35,6 @@ module.exports = {
   compress: true,
   reactStrictMode: true,
   async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: securityHeaders,
-      },
-    ];
+    return [{ source: "/(.*)", headers: securityHeaders }];
   },
 };
